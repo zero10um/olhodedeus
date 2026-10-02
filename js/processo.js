@@ -149,6 +149,12 @@
   function desenharTopo() {
     const s = A.situacao(proc), el = vistaEl;
     el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}${!proc.arquivado && A.conflitosSala(proc).length ? `<span class="selo" style="--c:var(--critico);--cbg:var(--critico-bg)" title="${A.esc(A.conflitosSala(proc).map(A.textoConflito).join(' '))}">${A.ic('alerta')}Conflito de sala</span>` : ''}${A.classeTexto(proc) ? `<span class="etiqueta etiqueta-classe">${A.esc(A.classeTexto(proc))}</span>` : `<button type="button" class="selo" id="classificar" style="--c:var(--atencao);--cbg:var(--atencao-bg)" data-editar>${A.ic('alerta')}Classificar: interno ou externo?</button>`}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
+    const fa = el.querySelector('#faixaArquivar');
+    if (fa) {
+      fa.innerHTML = !proc.arquivado && A.tudoFeito(proc) && pode() ? `<div class="faixa-arquivar">${A.ic('feito')}<span><strong>Tudo feito neste processo.</strong> Quer arquivar? Ele sai do painel e continua em Processos &gt; Arquivados, na busca e na Agenda.</span><button class="btn btn-primario" type="button" id="arquivarJa">${A.ic('arquivo-ic')} Arquivar</button></div>` : '';
+      const bj = fa.querySelector('#arquivarJa');
+      if (bj) bj.onclick = () => { const desfaz = A.arquivar(proc); A.redesenhar(); A.avisar('Processo arquivado.', () => { desfaz(); A.redesenhar(); }); };
+    }
     el.querySelector('#titulo').textContent = proc.titulo;
     el.querySelector('#trilhaTitulo').textContent = proc.titulo;
     document.title = `${proc.titulo} — Meus processos`;
@@ -658,6 +664,7 @@
     }
     vista.innerHTML = `<main>
       <nav class="trilha" aria-label="Você está em"><a href="#/painel">${A.ic('anterior')}Painel</a><span aria-hidden="true">/</span><a href="#/processos">Processos</a><span aria-hidden="true">/</span><span aria-current="page" id="trilhaTitulo"></span></nav>
+      <div id="faixaArquivar"></div>
       <section class="proc-topo" aria-labelledby="titulo"><div><div class="selos" id="selos"></div><h1 id="titulo"></h1><div class="meta" id="meta"></div></div><div class="contagem" id="contagem"></div></section>
       <dl class="fatos" id="fatos"></dl>
       <section class="editar-dados" id="editarDados" hidden aria-labelledby="t-editar"></section>

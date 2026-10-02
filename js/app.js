@@ -14,6 +14,7 @@
       ${pagina === 'painel' || supa ? `<div class="busca" role="search">${A.ic('busca')}<label class="sr" for="buscaTopo">${supa ? 'Buscar curso ou número SEI na equipe toda' : 'Buscar curso ou número SEI'}</label><input id="buscaTopo" type="search" placeholder="${supa ? 'Buscar SEI ou curso na equipe' : 'Buscar curso ou SEI'}" autocomplete="off" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" hidden></div></div>` : '<span style="margin-left:auto"></span>'}
       ${A.modo === 'nuvem' ? '<span class="status-nuvem" id="statusNuvem" role="status" aria-live="polite"></span>' : ''}
       <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}${supa && A.nuvem.admin ? link('equipe', 'Equipe', pagina === 'equipe') : ''}</nav>
+      ${A.botaoAvisos()}
       <div class="perfil"><button type="button" class="perfil-btn" aria-haspopup="menu" aria-expanded="false" id="perfilBtn">${A.avatar(dono)}<span>${A.esc(dono.ini)}</span>${A.ic('seta')}<span class="sr">, ${modoTxt}. Abrir menu do perfil</span></button>
         <div class="menu-flutuante" role="menu" hidden>
           <div class="quem" role="none"><strong>Painel de ${A.esc(dono.ini)}</strong><span class="secundario">${supa ? 'Servidor' : A.esc(dono.funcao || '')}. ${modoTxt}.</span></div>
@@ -39,6 +40,7 @@
       };
       document.addEventListener('click', e => { if (!e.target.closest('.busca')) res.hidden = true; });
     }
+    A.ligarAvisos();
     const caixa = el.querySelector('.perfil');
     A.ligarMenu(caixa, caixa.querySelector('#perfilBtn'), caixa.querySelector('.menu-flutuante'), '[role=menuitem]');
     caixa.querySelector('#trocarPessoa').onclick = () => { A.sair(); location.hash = '#/entrar'; };

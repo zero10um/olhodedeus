@@ -267,7 +267,13 @@
   A.AMBITOS = { interno: ['Interno', 'A escola promove e atende'], externo: ['Externo', 'O servidor vai a um evento de fora'] };
   A.PUBLICOS = { membros: 'Membros', ambos: 'Membros e servidores', servidores: 'Servidores' };
   A.classeTexto = p => [p.ambito && A.AMBITOS[p.ambito][0], p.publico && A.PUBLICOS[p.publico]].filter(Boolean).join(' · ');
-  const soNoExterno = f => ['local', 'comunicacao', 'contratacao'].includes(f.modeloId);
+  const soNoInterno = f => ['local', 'comunicacao'].includes(f.modeloId); // a escola não sedia nem divulga evento de fora
+  /* Passos que só existem no externo: entram sozinhos quando o processo é externo */
+  const EXTRAS_EXTERNO = [
+    ['financeira', 'ext-inscricao', 'Pagar a inscrição no evento', 20, 'antes', 'inicio'],
+    ['pos', 'ext-avisar', 'Avisar o servidor: o certificado será cobrado em 15 dias', 1, 'depois', 'fim'],
+    ['pos', 'ext-cobrar', 'Cobrar o certificado do servidor', 15, 'depois', 'fim'],
+  ];
   const certApresentado = n => /certificad/.test(n) && /apresent/.test(n);
   const certEmitido = n => /certificad/.test(n) && /emit/.test(n);
   /* Liga e desliga o que não se aplica conforme interno/externo; não mexe no que a pessoa marcou à mão */
@@ -278,15 +284,31 @@
       if (na && !o.na) { o.na = true; o.naPor = 'ambito'; }
       else if (!na && o.na && o.naPor === 'ambito') { o.na = false; delete o.naPor; }
     };
+    if (ext) EXTRAS_EXTERNO.forEach(([fr, chave, nome, dias, quando, ref]) => {
+      const f = p.frentes.find(x => x.modeloId === fr);
+      if (f && !f.itens.some(i => i.extra === chave)) f.itens.push({ id: 'i' + A.uid(), modeloId: null, extra: chave, so: 'externo', nome, regra: { dias, quando, ref }, estado: 'aberta', coluna: null, na: false, editado: false });
+    });
     p.frentes.forEach(f => {
-      if (soNoExterno(f)) marcar(f, ext);
+      if (soNoInterno(f)) marcar(f, ext);
+      else if (f.na && f.naPor === 'ambito') marcar(f, false);
       f.itens.forEach(i => {
         const n = A.semAcento(i.nome);
-        if (certApresentado(n)) marcar(i, !ext);
+        if (i.so) marcar(i, i.so !== p.ambito);
+        else if (certApresentado(n)) marcar(i, !ext);
         else if (certEmitido(n)) marcar(i, ext);
       });
     });
   };
+
+  /* Arquivar: sai do painel e da lista do dia a dia, mas continua em Processos > Arquivados, na busca e na Agenda */
+  A.arquivar = (p, sim = true) => {
+    const antes = !!p.arquivado;
+    p.arquivado = sim;
+    A.anotar(p, 'Sistema', sim ? 'Processo arquivado.' : 'Processo tirado do arquivo.');
+    A.salvar();
+    return () => { p.arquivado = antes; p.diario.pop(); A.salvar(); };
+  };
+  A.tudoFeito = p => { const it = A.itensAtivos(p); return it.length > 0 && it.every(x => x.i.estado === 'feita'); };
 
   A.novoProcesso = (dados, perfilId) => {
     const regras = A.regras(perfilId);

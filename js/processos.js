@@ -12,7 +12,7 @@
     const nArq = todos.filter(p => p.arquivado).length;
     vista.innerHTML = `<main>
       <div class="cabeca"><div><h1>Processos</h1><p class="secundario" style="margin-top:6px">${todos.length - nArq} em andamento${nArq ? `, ${nArq} arquivado${nArq > 1 ? 's' : ''}` : ''}.</p></div>
-        ${pode ? `<div class="cabeca-acoes"><div class="botoes"><a class="btn" href="#/planilha">${A.ic('atualizar')} Ler planilha</a><button class="btn btn-primario" type="button" id="btnNovo" aria-expanded="${!!novo}" aria-controls="formNovo">${A.ic('mais')} Novo processo</button></div></div>` : ''}</div>
+        ${pode ? `<div class="cabeca-acoes"><div class="botoes">${A.semPlanilha() ? '' : `<a class="btn" href="#/planilha">${A.ic('atualizar')} Ler planilha</a>`}<button class="btn btn-primario" type="button" id="btnNovo" aria-expanded="${!!novo}" aria-controls="formNovo">${A.ic('mais')} Novo processo</button></div></div>` : ''}</div>
       <div id="formNovo"></div>
       <div class="bloco" style="margin-top:24px">
         <div class="bloco-topo" style="margin-bottom:12px">

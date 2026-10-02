@@ -38,7 +38,7 @@
   /* Cada processo com data vira um evento da agenda */
   function eventos() {
     const hoje = A.hojeIso();
-    return A.estado.processos.filter(p => !p.arquivado && p.inicio).map(p => {
+    return A.estado.processos.filter(p => p.inicio).map(p => {
       const quem = A.perfil(p.dono) || { ini: '?', cor: 'var(--neutro)', bg: 'var(--neutro-bg)' };
       const frentes = p.frentes.map(f => {
         const e = A.estadoFrente(p, f);
