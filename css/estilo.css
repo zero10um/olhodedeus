@@ -1170,3 +1170,64 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .sugestao .ic { color: var(--caneta); }
 .pergunta-fin { margin-bottom: var(--e-3); padding-bottom: var(--e-3); border-bottom: 1px dotted var(--linha); }
 .pergunta-fin .segmento span { min-width: 0; }
+
+/* ===== Uma fase por vez + início guiado ===== */
+.caminho .vendo button { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+.caminho .vendo .t { width: fit-content; background: linear-gradient(var(--grifo-aqui), var(--grifo-aqui)) no-repeat 0 62% / 100% 58%; mix-blend-mode: var(--mistura); }
+.fase-nav { display: flex; justify-content: space-between; gap: var(--e-3); margin-top: var(--e-5); padding-top: var(--e-4); border-top: 1px solid var(--tinta); }
+.fase-nav .btn { gap: 10px; text-align: left; }
+.fase-nav .btn span { display: flex; flex-direction: column; line-height: 1.2; font-weight: 700; }
+.fase-nav small { font-size: 11px; font-weight: 650; font-stretch: 78%; text-transform: uppercase; letter-spacing: .08em; color: var(--tinta-2); }
+.fase-nav .fase-prox { text-align: right; margin-left: auto; }
+.fase-nav .fase-prox span { align-items: flex-end; }
+.fase-pe { margin-top: var(--e-4); justify-content: space-between; align-items: center; }
+
+.guia { background: var(--folha); border: 1px solid var(--tinta); padding: var(--e-5); margin-bottom: var(--e-4); }
+.guia-topo { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e-3); }
+.guia-rot { font-size: 12.5px; font-weight: 700; font-stretch: 78%; text-transform: uppercase; letter-spacing: .08em; color: var(--tinta-2); }
+.guia-passos { list-style: none; margin: var(--e-3) 0 var(--e-5); padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; border-bottom: 1px solid var(--linha); }
+.guia-passos li { display: flex; align-items: center; }
+.guia-passos li + li::before { content: ""; width: 18px; height: 1px; background: var(--borda-campo); margin: 0 4px; }
+.guia-passos button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; font: inherit; font-size: var(--t-sm); padding: 6px 4px 10px; cursor: pointer; color: var(--tinta-2);
+  border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.guia-passos button:disabled { cursor: default; opacity: .5; }
+.guia-passos .guia-n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border: 1.5px solid currentColor; border-radius: 2px; font-size: 12px; font-weight: 800; }
+.guia-passos .feita button { color: var(--ok); }
+.guia-passos .feita .guia-n { background: var(--ok); border-color: var(--ok); color: var(--sobre-cor); }
+.guia-passos .atual button { color: var(--tinta); font-weight: 700; }
+.guia-passos .vendo button { color: var(--tinta); font-weight: 750; border-bottom-color: var(--tinta); }
+.guia-corpo { min-height: 190px; }
+.guia-corpo h3 { font-size: 26px; font-weight: 800; font-stretch: 90%; letter-spacing: -0.01em; line-height: 1.15; max-width: 30ch; }
+.guia-corpo > .secundario { margin-top: 6px; font-size: var(--t-base); max-width: 60ch; }
+.guia-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--e-3); margin-top: var(--e-4); }
+.guia-op { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; border: 1px solid var(--borda-campo); background: var(--folha); color: var(--tinta); font: inherit;
+  padding: 16px 16px 18px; cursor: pointer; min-height: 92px; transition: border-color .15s, background-size .35s cubic-bezier(.16, 1, .3, 1);
+  background-image: linear-gradient(var(--grifo-aqui), var(--grifo-aqui)); background-repeat: no-repeat; background-size: 0% 100%; }
+.guia-op strong { font-size: var(--t-lg); font-weight: 800; }
+.guia-op small { color: var(--tinta-2); font-size: var(--t-sm); }
+.guia-op:hover, .guia-op:focus-visible { border-color: var(--tinta); }
+.guia-op.marcado { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); background-size: 100% 100%; }
+.guia-op:disabled { cursor: default; opacity: .6; }
+.guia-botoes { display: flex; flex-wrap: wrap; gap: var(--e-3); align-items: center; margin-top: var(--e-4); }
+.guia-campo { display: flex; flex-wrap: wrap; gap: 8px var(--e-3); align-items: center; margin-top: var(--e-4); }
+.guia-campo > span { font-weight: 700; font-size: var(--t-sm); }
+.guia-campo.campo { display: block; max-width: 420px; }
+.guia-espera { display: flex; gap: var(--e-3); align-items: center; margin-top: var(--e-4); padding: 14px 16px; border: 1px dashed var(--atencao); }
+.guia-espera > .ic { width: 28px; height: 28px; color: var(--atencao); animation: guiaPulso 2.4s ease-in-out infinite; }
+.guia-espera-t { font-weight: 800; font-size: var(--t-lg); background: linear-gradient(var(--atencao-bg), var(--atencao-bg)) no-repeat 0 62% / 100% 55%; mix-blend-mode: var(--mistura); display: inline; }
+@keyframes guiaPulso { 50% { opacity: .45; } }
+.guia-resumo { display: grid; gap: 6px; margin: var(--e-4) 0 0; max-width: 520px; }
+.guia-resumo div { display: grid; grid-template-columns: 150px 1fr; gap: var(--e-3); border-bottom: 1px dotted var(--linha); padding-bottom: 6px; }
+.guia-resumo dt { font-size: 12.5px; font-weight: 650; font-stretch: 78%; text-transform: uppercase; letter-spacing: .07em; color: var(--tinta-2); }
+.guia-resumo dd { margin: 0; font-weight: 700; }
+.guia-nav { display: flex; justify-content: space-between; margin-top: var(--e-5); padding-top: var(--e-3); border-top: 1px dotted var(--linha); }
+.guia-lista { margin-top: var(--e-2); }
+.guia-lista > summary { cursor: pointer; font-weight: 700; font-size: var(--t-sm); color: var(--caneta); padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
+.guia-lista[open] > summary { margin-bottom: var(--e-3); }
+@media (max-width: 760px) {
+  .guia { padding: var(--e-4); }
+  .guia-corpo h3 { font-size: 22px; }
+  .guia-passos li + li::before { width: 8px; }
+  .fase-nav .btn { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .guia-espera > .ic { animation: none; } .guia-op { transition: none; } }

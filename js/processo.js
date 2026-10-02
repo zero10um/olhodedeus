@@ -11,7 +11,7 @@
 
   let proc = null, vistaEl = null;
   let abertas = new Set(), formDespacho = null, editandoPasso = null, formSei = false, editandoDados = false, ultimaFicha = null, linhaBrilho = null, procAnterior = null;
-  let CRONO = null;
+  let CRONO = null, faseVista = null;
 
   const pode = () => A.podeEditar();
   const I = id => A.acharItem(proc, id);
@@ -35,6 +35,8 @@
   const fasesVisiveis = () => A.FASES.filter(fa => fa.id === 'evento' ? !!proc.inicio : proc.frentes.some(f => f.fase === fa.id));
   function faseAtual() {
     if (!A.aprovado(proc)) return 'inicio';
+    // processo novo com início guiado: começa pelo início até ele ser resolvido
+    if (A.guiaAplica(proc) && !A.guiaConcluido(proc) && ((proc.guia && proc.guia.plano) || !proc.frentes.some(f => f.fase !== 'inicio' && f.itens.some(i => i.estado === 'feita')))) return 'inicio';
     const fs = fasesVisiveis().map(f => f.id);
     if (proc.inicio) {
       if (A.dias(proc.inicio) > 0) return fs.includes('prep') ? 'prep' : 'inicio';
@@ -270,7 +272,7 @@
       if (fa.id === 'evento') { total = 1; feitas = A.dias(proc.fim || proc.inicio) < 0 ? 1 : 0; }
       else proc.frentes.filter(f => f.fase === fa.id && !f.na).forEach(f => f.itens.filter(x => !x.na).forEach(t => { total++; if (t.estado === 'feita') feitas++; }));
       if (fa.id === 'inicio' && proc.previsto === false) { total += 3; feitas += (proc.portao || []).filter(Boolean).length; }
-      const pronta = total && feitas === total, cls = fa.id === atual ? 'atual' : pronta ? 'pronta' : '';
+      const pronta = total && feitas === total, cls = (fa.id === atual ? 'atual' : pronta ? 'pronta' : '') + (umaPorVez() && fa.id === faseNaTela() ? ' vendo' : '');
       const d = fa.id === 'evento' ? `${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}` : fa.d;
       const cont = fa.id === 'evento' ? (A.dias(proc.inicio) > 0 ? `em ${A.dias(proc.inicio)} dias` : A.dias(proc.fim || proc.inicio) >= 0 ? 'acontecendo' : 'aconteceu') : `${feitas} de ${total}`;
       return `<li class="${cls}"><button type="button" data-ir="${fa.id}" ${fa.id === atual ? 'aria-current="step"' : ''}>
@@ -279,6 +281,7 @@
         <span class="barra-c" aria-hidden="true"><i style="transform:scaleX(${total ? feitas / total : 0})"></i></span></button></li>`;
     }).join('');
     ol.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
+      if (modo() === 'frentes' && umaPorVez()) return irParaFase(b.dataset.ir);
       if (modo() !== 'frentes') { A.prefs().modoProc = 'frentes'; A.salvar(); desenhar(); }
       const alvo = vistaEl.querySelector('#fase-' + b.dataset.ir); if (!alvo) return;
       A.rolarAte(alvo); const h = alvo.querySelector('h2'); h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true });
@@ -325,15 +328,52 @@
       <p class="liberado${ok ? '' : ' nao'}">${ok ? A.ic('feito') + (proc.previsto === false && proc.destravado && !(proc.portao || []).every(Boolean) ? ' Destravado sem esperar a autorização.' : ' Liberado: as frentes da preparação podem andar ao mesmo tempo.')
         : A.ic('cadeado') + ` Esperando a autorização. As frentes da preparação ficam travadas.${pode() ? ' <button type="button" class="btn-texto" id="destravar">Destravar mesmo assim</button>' : ''}`}</p></div>`;
   }
+  const umaPorVez = () => !A.prefs().todasFases;
+  function faseNaTela() {
+    const fs = fasesVisiveis();
+    return faseVista && fs.some(f => f.id === faseVista) ? faseVista : faseAtual();
+  }
+  let dirFase = 1;
+  function irParaFase(id) {
+    const fs = fasesVisiveis().map(f => f.id);
+    dirFase = fs.indexOf(id) >= fs.indexOf(faseNaTela()) ? 1 : -1;
+    faseVista = id;
+    if (modo() !== 'frentes') { A.prefs().modoProc = 'frentes'; A.salvar(); }
+    desenharCaminho(); desenharConteudo();
+    const alvo = vistaEl.querySelector('#fase-' + id);
+    if (alvo) {
+      if (!A.semMovimento()) alvo.animate([{ opacity: 0, transform: `translateX(${dirFase * 24}px)` }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+      const top = vistaEl.querySelector('#caminho').getBoundingClientRect().top + window.scrollY - 12;
+      if (window.scrollY > top) window.scrollTo({ top, behavior: A.semMovimento() ? 'auto' : 'smooth' });
+      const h = alvo.querySelector('h2'); h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true });
+    }
+  }
   function desenharFases(el) {
-    el.innerHTML = fasesVisiveis().map((fa, i) => {
+    const fs = fasesVisiveis(), naTela = faseNaTela(), uma = umaPorVez();
+    const pos = fs.findIndex(f => f.id === naTela);
+    el.innerHTML = fs.map((fa, i) => {
+      if (uma && fa.id !== naTela) return '';
       const fr = proc.frentes.filter(f => f.fase === fa.id);
       let corpo = '';
       if (fa.id === 'evento') corpo = `<div class="portao"><p><strong>${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}</strong>${proc.horario ? ', ' + A.esc(proc.horario) : ''}${proc.local ? ', ' + A.esc(proc.local) : ''}.</p><p class="secundario" style="margin-top:4px">${A.dias(proc.inicio) > 0 ? `Faltam ${A.dias(proc.inicio)} dias. Os prazos das outras fases são contados a partir destas datas.` : 'O evento já começou.'}</p></div>`;
+      else if (fa.id === 'inicio' && A.guiaAplica(proc)) {
+        const nPassos = fr.reduce((s, f) => s + f.itens.filter(x => !x.na).length, 0);
+        corpo = A.guiaHTML(proc, pode()) + `<details class="guia-lista"${A.prefs().guiaListaAberta ? ' open' : ''}><summary>Ver todos os passos do início (${nPassos})</summary>${portaoHTML()}<div class="frentes">${fr.map(frenteHTML).join('')}</div></details>`;
+      }
       else corpo = (fa.id === 'inicio' ? portaoHTML() : '') + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>`;
       return `<section class="fase" id="fase-${fa.id}" aria-labelledby="h-${fa.id}"><div class="fase-topo"><h2 id="h-${fa.id}">${i + 1}. ${fa.n}</h2>${SUB_FASE[fa.id] ? `<p class="secundario">${SUB_FASE[fa.id]}</p>` : ''}</div>${corpo}</section>`;
-    }).join('') + (pode() ? `<div class="form-botoes" style="margin-top:24px"><button type="button" class="btn" id="novaFrente">${A.ic('mais')}Adicionar uma frente a este processo</button></div>` : '');
+    }).join('')
+      + (uma ? `<nav class="fase-nav" aria-label="Trocar de fase">
+          ${pos > 0 ? `<button class="btn btn-grande" type="button" data-fase="${fs[pos - 1].id}">${A.ic('anterior')}<span><small>Voltar</small>${fs[pos - 1].n}</span></button>` : '<span></span>'}
+          ${pos < fs.length - 1 ? `<button class="btn btn-grande fase-prox" type="button" data-fase="${fs[pos + 1].id}"><span><small>Avançar</small>${fs[pos + 1].n}</span>${A.ic('proximo')}</button>` : '<span></span>'}
+        </nav>` : '')
+      + `<div class="form-botoes fase-pe">${pode() ? `<button type="button" class="btn" id="novaFrente">${A.ic('mais')}Adicionar uma frente a este processo</button>` : ''}<button type="button" class="btn-texto" id="todasFases">${uma ? 'Ver todas as fases juntas' : 'Ver uma fase por vez'}</button></div>`;
     ligarFases(el);
+    el.querySelectorAll('[data-fase]').forEach(b => b.onclick = () => irParaFase(b.dataset.fase));
+    el.querySelector('#todasFases').onclick = () => { A.prefs().todasFases = !A.prefs().todasFases; A.salvar(); desenharCaminho(); desenharConteudo(); };
+    const gl = el.querySelector('.guia-lista'); if (gl) gl.ontoggle = () => { A.prefs().guiaListaAberta = gl.open; A.salvar(); };
+    const guia = el.querySelector('.guia');
+    if (guia) A.guiaLigar(guia, proc, { redesenhar: () => { faseVista = 'inicio'; A.salvar(); desenhar(); }, irParaFase: id => { desenharTopo(); irParaFase(id); } });
   }
   function ligarFases(el) {
     el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => {
@@ -697,7 +737,7 @@
     }
     if (procAnterior !== id) {
       abertas = new Set(proc.frentes.filter(f => !f.na && f.itens.some(i => !i.na && i.estado !== 'feita')).map(f => f.id));
-      formDespacho = null; editandoPasso = null; formSei = false; editandoDados = false; ultimaFicha = null; procAnterior = id;
+      formDespacho = null; editandoPasso = null; formSei = false; editandoDados = false; ultimaFicha = null; procAnterior = id; faseVista = null;
     }
     vista.innerHTML = `<main>
       <nav class="trilha" aria-label="Você está em"><a href="#/painel">${A.ic('anterior')}Painel</a><span aria-hidden="true">/</span><a href="#/processos">Processos</a><span aria-hidden="true">/</span><span aria-current="page" id="trilhaTitulo"></span></nav>
