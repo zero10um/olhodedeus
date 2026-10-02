@@ -62,7 +62,7 @@
   }
 
   /* ---------- Estado da tela ---------- */
-  const st = { nivel: null, ancora: A.hojeIso(), fds: false, quem: null, sel: null };
+  const st = { nivel: null, ancora: A.hojeIso(), fds: false, quem: null, sel: null, visto: undefined };
   let cal, det, raiz, evs = [];
   const visiveis = () => evs.filter(e => !st.quem || st.quem.has(e.p.dono));
   const ocorre = (e, d) => d >= e.ini && d <= e.fim;
@@ -102,6 +102,9 @@
     const pr = A.prefs().agenda || {};
     if (!st.nivel) { st.nivel = pr.nivel || (innerWidth < 640 ? 'dia' : 'semana'); st.fds = !!pr.fds; }
     evs = eventos();
+    // o que colegas cadastraram desde a sua última visita fica grifado "novo" (nesta visita inteira)
+    if (st.visto === undefined) { st.visto = A.prefs().agendaVisto || null; A.prefs().agendaVisto = new Date().toISOString(); A.salvar(); }
+    evs.forEach(e => { e.novo = !!st.visto && e.p.dono !== A.euId() && (e.p.criadoEm || '') > st.visto; });
     vista.innerHTML = `<main class="tela-agenda" id="telaAgenda">
       <div class="abarra">
         <h1>Agenda da equipe</h1>
@@ -201,7 +204,7 @@
       style="${cor(e)};top:calc(var(--hora) * ${top} + 1px);height:calc(var(--hora) * ${alt} - 3px);left:calc(${x.t} / ${x.n} * 100% + 3px);width:calc(100% / ${x.n} - 6px)"
       aria-label="${A.esc(e.t)}, ${e.h} às ${e.hf}${multi}${e.local ? ', ' + A.esc(e.local) : ''}, responsável ${A.esc(e.quem.ini)}. ${s.longo}.">
       <span class="aev-topo"><span>${e.h}${e.aprox ? '' : '–' + e.hf}${multi}</span><span class="avatar amini" style="${corAv(e.quem)}">${A.esc(e.quem.ini.replace(/\./g, ''))}</span></span>
-      <span class="aev-t">${A.esc(e.t)}</span>
+      <span class="aev-t">${e.novo ? '<span class="novo">novo</span> ' : ''}${A.esc(e.t)}</span>
       ${e.local || e.sala === 'falta' ? `<span class="aev-l">${salaIc} ${A.esc(e.local || 'Local a definir')}${e.sala === 'falta' ? ' · sala a reservar' : ''}</span>` : ''}
       <span class="aselo ${s.c}">${s.txt}</span>${extra}
     </button>`;
@@ -217,7 +220,7 @@
   function pill(e, d, largo) {
     const s = e.sit, total = A.entre(e.ini, e.fim) + 1;
     return `<button class="ag-pill${st.sel === e.id ? ' sel' : ''}" type="button" data-id="${e.id}" style="${cor(e)}" aria-label="${A.esc(e.t)}${e.h ? ', ' + e.h : ''}${e.local ? ', ' + A.esc(e.local) : ''}, responsável ${A.esc(e.quem.ini)}. ${s.longo}.">
-      <span class="l1"><span class="ag-ponto ${s.c}"></span>${e.h ? `<span>${e.h}</span>` : ''}<b>${A.esc(e.t)}</b></span>
+      <span class="l1"><span class="ag-ponto ${s.c}"></span>${e.h ? `<span>${e.h}</span>` : ''}${e.novo ? '<span class="novo">novo</span>' : ''}<b>${A.esc(e.t)}</b></span>
       ${largo ? `<span class="l2">${A.esc(e.quem.ini)}${e.local ? ' · ' + A.esc(e.local) : ''}${total > 1 ? ` · dia ${A.entre(e.ini, d) + 1} de ${total}` : ''}</span>` : ''}
     </button>`;
   }

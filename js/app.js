@@ -96,7 +96,12 @@
   }
   A.redesenhar = () => desenhar();
 
+  /* O marca-texto só "passa" quando a tela abre, não a cada clique */
+  let tGrifo;
+  const grifar = () => { document.body.classList.add('animar-grifos'); clearTimeout(tGrifo); tGrifo = setTimeout(() => document.body.classList.remove('animar-grifos'), 1400); };
+  A.grifar = grifar;
   window.addEventListener('hashchange', () => {
+    grifar();
     if (rota()[0] === 'entrar' && A.sessao) A.sair();
     const v = vista(); v.style.animation = 'none'; void v.offsetWidth; v.style.animation = '';
     A.mudar(desenhar).then(() => { window.scrollTo(0, 0); const h = v.querySelector('h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
@@ -135,6 +140,7 @@
       if (!(s && A.perfil(s.perfilId))) { if (A.perfil(N.eu)) A.entrarComo(N.eu, N.podeEscrever === false ? 'leitura' : 'dono'); else A.sair(); }
     } else A.carregar();
     if (!location.hash || (A.sessao && A.dono() && rota()[0] === 'entrar' && A.modo === 'nuvem')) location.replace(A.sessao && A.dono() ? '#/painel' : '#/entrar');
+    grifar();
     desenhar();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

@@ -148,7 +148,7 @@
   /* ---------- Topo ---------- */
   function desenharTopo() {
     const s = A.situacao(proc), el = vistaEl;
-    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
+    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
     el.querySelector('#titulo').textContent = proc.titulo;
     el.querySelector('#trilhaTitulo').textContent = proc.titulo;
     document.title = `${proc.titulo} — Meus processos`;

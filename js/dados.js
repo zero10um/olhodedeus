@@ -189,7 +189,7 @@
     na: ['Não se aplica', 'var(--neutro)', 'var(--neutro-bg)', 'circulo'],
     travada: ['Espera a aprovação', 'var(--atencao)', 'var(--atencao-bg)', 'cadeado'],
   };
-  A.seloFrente = e => `<span class="selo" style="--c:${A.ESTADO_FRENTE[e][1]};--cbg:${A.ESTADO_FRENTE[e][2]}">${A.ic(A.ESTADO_FRENTE[e][3])}${A.ESTADO_FRENTE[e][0]}</span>`;
+  A.seloFrente = e => `<span class="selo${e === 'feito' ? ' carimbo' : ''}" style="--c:${A.ESTADO_FRENTE[e][1]};--cbg:${A.ESTADO_FRENTE[e][2]}">${A.ic(A.ESTADO_FRENTE[e][3])}${A.ESTADO_FRENTE[e][0]}</span>`;
 
   /* Situação do processo: cruza a proximidade da data com o que falta */
   A.SIT = {
@@ -213,7 +213,7 @@
     if ((abertas.length && ev >= 0 && ev <= lim.atencao) || prazos.some(p => A.dias(p) <= lim.vencendo)) return 'atencao';
     return 'emdia';
   };
-  A.seloSit = s => `<span class="selo" style="--c:${A.SIT[s].c};--cbg:${A.SIT[s].bg}">${A.ic(A.SIT[s].ic)}${A.SIT[s].nome}</span>`;
+  A.seloSit = s => `<span class="selo${s === 'ok' ? ' carimbo' : ''}" style="--c:${A.SIT[s].c};--cbg:${A.SIT[s].bg}">${A.ic(A.SIT[s].ic)}${A.SIT[s].nome}</span>`;
   A.cores = s => `--c:${A.SIT[s].c};--cbg:${A.SIT[s].bg}`;
   A.pior = lista => lista.reduce((a, b) => A.PESO[b] > A.PESO[a] ? b : a, 'ok');
 

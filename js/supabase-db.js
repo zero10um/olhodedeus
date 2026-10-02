@@ -96,6 +96,7 @@
     ['qui', [[20, 50, .48]]],
     ['sex', [[10, 20, .38], [40, 14, .28], [62, 24, .45]]],
   ];
+  const GRIFOS = ['--emdia-bg', '--atencao-bg', '--ok-bg', '--grifo-aqui', '--emdia-bg', '--critico-bg', '--atencao-bg'];
   const LOGO = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14.5h3M8 17h6" stroke-width="1.8"/></svg>';
 
   /* Resolve quando a pessoa estiver dentro */
@@ -106,7 +107,7 @@
       <section class="login-arte" aria-hidden="true">
         <div class="login-marca">${LOGO}<span>Agenda pedagógica</span></div>
         <div class="login-semana">
-          ${SEMANA.map(([d, blocos], k) => `<div class="ls-col${k === hoje ? ' hoje' : ''}"><span class="ls-dia">${d}</span><div class="ls-trilho">${blocos.map(([t, h, o]) => `<span class="ls-bloco" style="--t:${t};--h:${h};--o:${o};--i:${i++}"></span>`).join('')}</div></div>`).join('')}
+          ${SEMANA.map(([d, blocos], k) => `<div class="ls-col${k === hoje ? ' hoje' : ''}"><span class="ls-dia">${d}</span><div class="ls-trilho">${blocos.map(([t, h]) => `<span class="ls-bloco" style="--t:${t};--h:${h};--g:var(${GRIFOS[i % GRIFOS.length]});--i:${i++}"></span>`).join('')}</div></div>`).join('')}
           <span class="ls-agora"></span>
         </div>
         <p class="login-frase">Os eventos da equipe, o que falta preparar e os SEIs de cada um, num lugar só.</p>
