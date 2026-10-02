@@ -49,6 +49,7 @@
     }, 250);
   };
   A.salvarJa = () => {
+    if (!A.estado) return; // ainda na tela de entrada: nada para guardar
     if (A.modo === 'nuvem') { A.nuvem.gravar(); return; }
     clearTimeout(timer); try { localStorage.setItem(CHAVE, JSON.stringify(A.estado)); } catch (e) {}
   };
@@ -111,6 +112,8 @@
   /* Quem está usando agora (nuvem: a conta do Claude; arquivo: o perfil que entrou) */
   A.euId = () => A.modo === 'nuvem' ? A.nuvem.eu : (A.sessao && A.sessao.perfilId);
   /* Na versão publicada para a equipe não existe planilha: o sistema é a fonte */
+  /* Regras de quem cria o perfil agora: o padrão da equipe (definido pela administração), ou o do sistema */
+  A.regrasNovas = () => A.estado.equipe && A.estado.equipe.regras && A.estado.equipe.regras.tipos ? A.clonar(A.estado.equipe.regras) : A.regrasPadrao();
   A.semPlanilha = () => A.modo === 'nuvem' && A.nuvem && A.nuvem.tipo === 'supabase';
   A.dono = () => A.sessao ? A.perfil(A.sessao.perfilId) : null;
   A.prefs = () => {

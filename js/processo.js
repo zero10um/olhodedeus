@@ -598,7 +598,7 @@
       f.querySelector('#sCancelar').onclick = () => { formSei = false; desenharLateral(); el.querySelector('#addSei').focus(); };
       f.onsubmit = e => {
         e.preventDefault();
-        const n = num.value.trim();
+        const n = A.seiGuardar(num.value.trim());
         if (n.length < 3) { num.setAttribute('aria-invalid', 'true'); er.hidden = false; num.focus(); return; }
         const novo = { id: 's' + A.uid(), tipo: f.querySelector('#sTipo').value, numero: n, desc: f.querySelector('#sDesc').value.trim(), f: f.querySelector('#sFrente').value || null };
         proc.seis.unshift(novo); formSei = false;

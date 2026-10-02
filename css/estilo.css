@@ -867,3 +867,67 @@ html[data-dir="esq"]::view-transition-old(cal), html[data-dir="dir"]::view-trans
 .ag-semhora .ag-pill { font-size: var(--t-xs); }
 .ag-vazio { margin: auto; text-align: center; max-width: 46ch; display: grid; gap: var(--e-3); justify-items: center; padding: var(--e-6); }
 .ag-cal .ag-pill .l1 > span:not(.ag-ponto) { flex: none; }
+
+/* ===== Entrada (usuário e senha) ===== */
+.login { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); background: var(--papel); }
+.login-arte { background: var(--caneta); color: var(--sobre-cor); padding: 40px 48px; display: flex; flex-direction: column; gap: 32px; position: relative; overflow: hidden; }
+.login-marca { display: flex; align-items: center; gap: 10px; font-size: var(--t-lg); font-weight: var(--destaque); letter-spacing: -0.01em; }
+.login-semana { flex: 1; min-height: 220px; max-height: 520px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; position: relative; }
+.ls-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; border-radius: 10px; padding: 6px; position: relative; }
+.ls-col::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: color-mix(in srgb, var(--sobre-cor) 12%, transparent); opacity: 0; animation: lsHoje .5s .75s cubic-bezier(.16, 1, .3, 1) both; }
+.ls-col:not(.hoje)::before { display: none; }
+.ls-dia { position: relative; font-size: var(--t-xs); font-weight: var(--forte); text-transform: uppercase; letter-spacing: .08em; opacity: .78; }
+.ls-col.hoje .ls-dia { opacity: 1; }
+.ls-trilho { position: relative; flex: 1; border-top: 1px solid color-mix(in srgb, var(--sobre-cor) 30%, transparent); }
+.ls-bloco { position: absolute; left: 0; right: 0; top: calc(var(--t) * 1%); height: calc(var(--h) * 1%); border-radius: 6px;
+  background: color-mix(in srgb, var(--sobre-cor) calc(var(--o) * 100%), transparent);
+  animation: lsBloco .6s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(120ms + var(--i) * 42ms); }
+.ls-col.hoje .ls-bloco { background: var(--sobre-cor); }
+.ls-agora { position: absolute; left: 0; right: 0; top: 47%; height: 2px; background: var(--sobre-cor); transform-origin: left; animation: lsAgora .7s .85s cubic-bezier(.16, 1, .3, 1) both; }
+.ls-agora::before { content: ""; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--sobre-cor); }
+.login-frase { font-size: var(--t-lg); line-height: 1.4; max-width: 30ch; margin: 0; font-weight: var(--forte); text-wrap: balance; }
+@keyframes lsBloco { from { clip-path: inset(0 0 100% 0 round 6px); } to { clip-path: inset(0 0 0 0 round 6px); } }
+@keyframes lsHoje { to { opacity: 1; } }
+@keyframes lsAgora { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: .9; } }
+
+.login-lado { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 48px 32px 24px; gap: 24px; }
+.login-form { width: 100%; max-width: 380px; display: grid; gap: 16px; }
+.login-form h1 { font-size: var(--t-xl); }
+.login-form > .secundario { margin-top: -8px; }
+.login-form .campo input { min-height: 44px; font-size: var(--t-base); padding: 9px 12px; transition: border-color .15s, box-shadow .15s; }
+.login-form .campo input:focus-visible { outline: none; border-color: var(--caneta); box-shadow: 0 0 0 3px color-mix(in srgb, var(--caneta) 22%, transparent); }
+.login-form .campo input[aria-invalid="true"] { border-color: var(--critico); box-shadow: 0 0 0 3px color-mix(in srgb, var(--critico) 18%, transparent); }
+.login-senha { position: relative; }
+.login-senha input { padding-right: 46px !important; }
+.login-senha .btn-icone { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+.login-senha .btn-icone[aria-pressed="true"] { color: var(--caneta); }
+.login-caps { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: var(--t-xs); color: var(--atencao-texto); }
+.login-extra { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.16, 1, .3, 1), opacity .2s; opacity: 0; margin-top: -16px; }
+.login-extra > div { overflow: hidden; min-height: 0; display: grid; gap: 10px; }
+.login-form.criando .login-extra { grid-template-rows: 1fr; opacity: 1; margin-top: 0; }
+.login-regra { margin: 0; font-size: var(--t-xs); }
+.login-erro { margin: 0; font-size: var(--t-sm); background: var(--critico-bg); padding: 8px 12px; border-radius: var(--raio); }
+.login-entrar { width: 100%; min-height: 48px; transition: background .15s, transform .12s; }
+.login-entrar:active { transform: scale(.985); }
+.login-entrar.carregando { cursor: progress; background: color-mix(in srgb, var(--caneta) 75%, var(--tinta)); }
+.login-troca { margin: 0; text-align: center; font-size: var(--t-sm); color: var(--tinta-2); }
+.login-troca .btn-texto { font-size: var(--t-sm); font-weight: var(--forte); }
+.login-rodape { margin: 0; font-size: var(--t-xs); color: var(--tinta-2); text-align: center; max-width: 380px; }
+.login-form.treme { animation: lsTreme .32s cubic-bezier(.36, .07, .19, .97); }
+@keyframes lsTreme { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.login.saindo .login-lado { opacity: 0; transform: translateY(-8px); transition: opacity .22s, transform .26s cubic-bezier(.16, 1, .3, 1); }
+.login.saindo .ls-bloco { transform: scaleY(1.04); filter: brightness(1.05); transition: transform .26s; }
+@media (max-width: 760px) {
+  .login { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .login-arte { padding: 20px 16px 18px; gap: 14px; }
+  .login-semana { flex: none; min-height: 0; height: 132px; gap: 6px; }
+  .ls-col { padding: 4px; gap: 4px; }
+  .login-frase { display: none; }
+  .login-lado { padding: 28px 16px 20px; justify-content: flex-start; }
+  .login-form h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-bloco, .ls-col::before, .ls-agora { animation-duration: 1ms; animation-delay: 0s; }
+  .login-form.treme { animation: none; }
+  .login-extra { transition: opacity .15s; }
+}

@@ -57,7 +57,7 @@
       <div class="grade-campos">
         <div class="campo largo"><label for="nTitulo">Nome do curso ou evento</label><input id="nTitulo"><div class="erro" hidden></div></div>
         <div class="campo"><label for="nTipo">Tipo</label><select id="nTipo">${regras.tipos.map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></div>
-        <div class="campo"><label for="nSei">Número do processo SEI</label><input id="nSei" placeholder="19.25.000000000.0000000/2026-00"><div class="erro" hidden></div></div>
+        <div class="campo"><label for="nSei">Número do processo SEI</label><input id="nSei" placeholder="19.25.000000000.0000000/2026-00" aria-describedby="nSeiVai"><div class="erro" hidden></div><p class="secundario" id="nSeiVai" style="font-size:var(--t-xs);margin-top:4px">Cole o número inteiro. ${A.lgpd() ? 'O sistema guarda só os últimos 11 dígitos.' : ''}</p></div>
         <div class="campo largo"><label for="nUnidade">Quem pediu (unidade)</label><input id="nUnidade"></div>
         <div class="campo"><label for="nEntrada">Chegou ao setor em</label><input id="nEntrada" type="date" value="${A.hojeIso()}"></div>
         <div class="campo" data-so="evento"><label for="nInicio">Início do evento</label><input id="nInicio" type="date"><div class="erro" hidden></div></div>
@@ -73,6 +73,12 @@
     const f = el.querySelector('#fNovo');
     const mostrar = () => { const t = regras.tipos.find(x => x.id === f.querySelector('#nTipo').value); f.querySelectorAll('[data-so]').forEach(c => c.hidden = c.dataset.so !== (t.ref === 'evento' ? 'evento' : 'limite')); };
     f.querySelector('#nTipo').onchange = mostrar; mostrar();
+    const vai = f.querySelector('#nSeiVai');
+    f.querySelector('#nSei').addEventListener('input', e => {
+      const v = e.target.value.trim(), d = v.replace(/\D/g, '');
+      vai.textContent = !v ? 'Cole o número inteiro.' + (A.lgpd() ? ' O sistema guarda só os últimos 11 dígitos.' : '')
+        : A.lgpd() && d.length >= 11 ? `Vai ficar guardado assim: ${A.seiGuardar(v)}` : A.lgpd() ? `Faltam dígitos: o número SEI tem pelo menos 11 (tem ${d.length}).` : '';
+    });
     f.querySelector('#nTitulo').focus();
     f.querySelectorAll('input').forEach(i => i.addEventListener('input', () => { i.removeAttribute('aria-invalid'); const m = i.parentElement.querySelector('.erro'); if (m) m.hidden = true; }));
     f.onsubmit = e => {
@@ -81,7 +87,8 @@
       const erro = (id, t) => { const c = f.querySelector('#' + id), m = c.parentElement.querySelector('.erro'); c.setAttribute('aria-invalid', 'true'); m.textContent = t; m.hidden = false; c.focus(); };
       if (!v('nTitulo')) return erro('nTitulo', 'Escreva o nome do curso ou evento.');
       const sei = A.seiNormal(v('nSei'));
-      if (sei && A.meus().some(p => A.seiChave(p.sei) === A.seiChave(sei))) return erro('nSei', 'Já existe um processo com este número SEI.');
+      const igual = sei && A.seiChave(sei).length >= 11 && (A.semPlanilha() ? A.estado.processos : A.meus()).find(p => A.seiChave(p.sei) === A.seiChave(sei));
+      if (igual) return erro('nSei', igual.dono === A.sessao.perfilId ? 'Você já cadastrou um processo com este número SEI.' : `Este SEI já foi cadastrado por ${(A.perfil(igual.dono) || {}).ini || 'outra pessoa'}.`);
       const tipo = regras.tipos.find(x => x.id === v('nTipo')), ev = tipo.ref === 'evento';
       if (ev && v('nFim') && !v('nInicio')) return erro('nInicio', 'Escolha também a data de início.');
       if (ev && v('nFim') && v('nFim') < v('nInicio')) return erro('nFim', 'O fim não pode ser antes do início.');

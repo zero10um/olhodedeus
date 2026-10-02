@@ -13,10 +13,10 @@
     el.innerHTML = `<a class="marca" href="#/painel">Meus processos</a>
       ${pagina === 'painel' ? `<div class="busca" role="search">${A.ic('busca')}<label class="sr" for="buscaTopo">Buscar curso ou número SEI</label><input id="buscaTopo" type="search" placeholder="Buscar curso ou SEI" autocomplete="off"></div>` : '<span style="margin-left:auto"></span>'}
       ${A.modo === 'nuvem' ? '<span class="status-nuvem" id="statusNuvem" role="status" aria-live="polite"></span>' : ''}
-      <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}</nav>
+      <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}${supa && A.nuvem.admin ? link('equipe', 'Equipe', pagina === 'equipe') : ''}</nav>
       <div class="perfil"><button type="button" class="perfil-btn" aria-haspopup="menu" aria-expanded="false" id="perfilBtn">${A.avatar(dono)}<span>${A.esc(dono.ini)}</span>${A.ic('seta')}<span class="sr">, ${modoTxt}. Abrir menu do perfil</span></button>
         <div class="menu-flutuante" role="menu" hidden>
-          <div class="quem" role="none"><strong>Painel de ${A.esc(dono.ini)}</strong><span class="secundario">${A.esc(dono.funcao || '')}. ${modoTxt}.</span></div>
+          <div class="quem" role="none"><strong>Painel de ${A.esc(dono.ini)}</strong><span class="secundario">${supa ? 'Servidor' : A.esc(dono.funcao || '')}. ${modoTxt}.</span></div>
           ${A.sessao.acesso === 'dono' ? `<a role="menuitem" href="#/perfil">${A.ic('pessoa')} ${supa ? 'Meu perfil' : 'Meu perfil e códigos'}</a>` : ''}
           <a role="menuitem" href="#/${supa ? 'relatorio' : 'planilha'}">${A.ic('baixar')} ${supa ? 'Relatório e cópia' : 'Cópia de segurança'}</a>
           <button type="button" role="menuitem" id="trocarPessoa">${A.ic('sair')} ${A.modo === 'nuvem' ? 'Ver outro painel' : 'Trocar de pessoa'}</button>
@@ -32,7 +32,7 @@
 
     const faixas = [];
     if (A.sessao.acesso === 'leitura') faixas.push(`<div class="faixa-acesso">${A.ic('olho')} Você está vendo o painel de <strong>${A.esc(dono.ini)}</strong> só para ler. Nada aqui pode ser alterado. <a href="#/entrar" id="sairFaixa">Voltar à tela inicial</a></div>`);
-    if (A.sessao.acesso === 'convidado') faixas.push(`<div class="faixa-acesso">${A.ic('pessoa')} Você está no painel de <strong>${A.esc(dono.ini)}</strong> e pode editar, porque a pessoa permitiu. <a href="#/entrar" id="sairFaixa">Voltar à tela inicial</a></div>`);
+    if (A.sessao.acesso === 'convidado') faixas.push(`<div class="faixa-acesso">${A.ic('pessoa')} Você está no painel de <strong>${A.esc(dono.ini)}</strong> e pode editar, ${supa ? 'como administração' : 'porque a pessoa permitiu'}. <a href="#/entrar" id="sairFaixa">Voltar à tela inicial</a></div>`);
     const lemb = lembreteAgora();
     if (lemb) faixas.push(`<div class="faixa-aviso faixa-lembrete">${A.ic('relogio')} São ${A.esc(lemb.hora)}: hora de atualizar a planilha. ${lemb.n ? `${lemb.n} mudança${lemb.n > 1 ? 's' : ''} esperando.` : 'Nada esperando hoje.'} <a href="#/planilha" id="lembIr">Abrir a planilha</a> <button type="button" class="btn-texto" id="lembOk">Hoje não</button></div>`);
     if (A.modo === 'nuvem') { /* online não depende de cópia de segurança */ }
@@ -49,6 +49,7 @@
 
   /* Lembrete de fim de expediente: só no próprio painel, em dias úteis, depois do horário escolhido */
   function lembreteAgora() {
+    if (!A.estado) return null;
     const eu = A.perfil(A.euId());
     if (A.modo === 'nuvem' && A.nuvem.tipo === 'supabase') return null;
     if (!eu || !eu.lembrete || !eu.lembrete.ativo || !A.sessao || A.sessao.perfilId !== eu.id || A.sessao.acesso !== 'dono') return null;
@@ -85,7 +86,9 @@
     else if (pagina === 'processos') A.telaProcessos(v, r[1] === 'novo');
     else if (pagina === 'processo') A.telaProcesso(v, r[1]);
     else if (pagina === 'regras') A.telaRegras(v);
+    else if (pagina === 'planilha' && A.semPlanilha()) { location.replace('#/relatorio'); return; }
     else if (pagina === 'planilha') A.telaPlanilha(v);
+    else if (pagina === 'equipe') { if (A.nuvem.admin) A.telaEquipe(v); else { location.replace('#/painel'); return; } }
     else if (pagina === 'agenda') A.telaAgenda(v);
     else if (pagina === 'relatorio') A.telaRelatorio(v);
     else if (pagina === 'perfil') A.telaPerfil(v);

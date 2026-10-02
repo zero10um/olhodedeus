@@ -11,6 +11,7 @@
     Object.entries(e.regras).forEach(([id, r]) => { if (A.perfil(id)) m['regras/' + id] = r; });
     Object.entries(e.leituras).forEach(([id, l]) => { if (A.perfil(id)) m['leituras/' + id] = l; });
     e.processos.forEach(p => { m['processos/' + p.id] = p; });
+    Object.entries(e.equipe || {}).forEach(([id, d]) => { m['equipe/' + id] = d; });
     if (N.eu) m['data/users/' + N.eu + '/prefs'] = e.prefs[N.eu] || {};
     return m;
   }
@@ -40,6 +41,7 @@
   /* Versão publicada na internet: banco do Supabase, cada um entra com usuário e senha */
   N.iniciarSupabase = async usuario => {
     Object.assign(N, { tipo: 'supabase', db: A.supa.db, user: usuario, eu: usuario.id, dono: true, podeEscrever: true });
+    N.admin = await A.supa.souAdmin();
     return carregar(A.supa.db, usuario.id);
   };
 
@@ -54,8 +56,15 @@
     if (me.exists) { A.estado.prefs[id] = A.clonar(me.data()); N.salvo['data/users/' + id + '/prefs'] = json(me.data()); }
     A.migrar();
     A.estado.config.lgpd = true;
+    const cols = ['perfis', 'regras', 'leituras', 'processos'];
+    if (N.tipo === 'supabase') {
+      // padrão da equipe (regras que cada servidor novo recebe), gravado só pelo admin
+      A.estado.equipe = {};
+      (await db.collection('equipe').get()).docs.forEach(d => { A.estado.equipe[d.id] = A.clonar(d.data()); N.salvo['equipe/' + d.id] = json(d.data()); });
+      cols.push('equipe');
+    }
 
-    ['perfis', 'regras', 'leituras', 'processos'].forEach(c => db.collection(c).onSnapshot(s => receber(c, s), erroAssinatura));
+    cols.forEach(c => db.collection(c).onSnapshot(s => receber(c, s), erroAssinatura));
     return true;
   }
 
@@ -67,7 +76,8 @@
       const caminho = col + '/' + ch.doc.id;
       if (ch.type === 'removed') {
         if (snap.metadata.hasPendingWrites) return;
-        if (col === 'processos') { const i = A.estado.processos.findIndex(p => p.id === ch.doc.id); if (i >= 0) { A.estado.processos.splice(i, 1); mudou = true; } }
+        if (col === 'processos' || col === 'perfis') { const l = col === 'processos' ? A.estado.processos : A.estado.perfis, i = l.findIndex(p => p.id === ch.doc.id); if (i >= 0) { l.splice(i, 1); mudou = true; } }
+        else { const mapa = A.estado[col]; if (mapa && mapa[ch.doc.id]) { delete mapa[ch.doc.id]; mudou = true; } }
         delete N.salvo[caminho];
         return;
       }
@@ -79,7 +89,7 @@
         const atual = lista.find(x => x.id === ch.doc.id);
         if (atual) substituir(atual, dados); else lista.push(A.clonar(dados));
       } else {
-        const mapa = col === 'regras' ? A.estado.regras : A.estado.leituras;
+        const mapa = A.estado[col] || (A.estado[col] = {});
         if (mapa[ch.doc.id]) substituir(mapa[ch.doc.id], dados); else mapa[ch.doc.id] = A.clonar(dados);
       }
       mudou = true;
@@ -113,7 +123,7 @@
         N.pendente = false;
         const docs = documentos();
         const mudados = Object.entries(docs).filter(([c, o]) => json(o) !== N.salvo[c] && meu(c, o));
-        const apagados = Object.keys(N.salvo).filter(c => c.startsWith('processos/') && !docs[c]);
+        const apagados = Object.keys(N.salvo).filter(c => /^(processos|perfis|regras|leituras|equipe)\//.test(c) && !docs[c]);
         N.faltam = mudados.length + apagados.length;
         for (const [caminho, obj] of mudados) {
           const j = json(obj);
@@ -145,6 +155,8 @@
   function meu(caminho, o) {
     if (N.tipo !== 'supabase') return true;
     const [col, id] = caminho.split('/');
+    if (N.admin) return true;
+    if (col === 'equipe') return false;
     if (col === 'processos') return o.dono === N.eu;
     if (col === 'data') return true;
     return id === N.eu;

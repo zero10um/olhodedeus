@@ -168,13 +168,13 @@
         <p class="sub">Crie o seu perfil para ter o seu painel. ${N.tipo === 'supabase' ? 'Você já entrou com o seu usuário e senha' : 'Você já entrou com a sua conta do Claude'}, então não precisa de código.</p><div id="entradaCaixa"></div></div>`;
       return mostrarCriarNuvem(vista);
     }
-    const acessoDe = id => id === N.eu ? 'dono' : (N.podeEscrever === false || N.tipo === 'supabase' ? 'leitura' : 'convidado');
+    const acessoDe = id => id === N.eu ? 'dono' : N.tipo === 'supabase' ? (N.admin ? 'convidado' : 'leitura') : (N.podeEscrever === false ? 'leitura' : 'convidado');
     vista.innerHTML = `<div class="entrada">
       <h1>${perfis.length ? 'Qual painel você quer abrir?' : 'Ainda não há painéis'}</h1>
-      <p class="sub">${perfis.length ? (N.podeEscrever === false ? 'Seu acesso é só para ver. Escolha um painel.' : N.tipo === 'supabase' ? 'O seu painel e os dos colegas. Os dos colegas abrem só para ver.' : 'O seu painel e os dos colegas. Nos dos colegas você pode ajudar, e tudo fica registrado no diário de cada processo.')
+      <p class="sub">${perfis.length ? (N.podeEscrever === false ? 'Seu acesso é só para ver. Escolha um painel.' : N.tipo === 'supabase' ? (N.admin ? 'O seu painel e os dos colegas. Como administração, você também pode alterar os dos colegas.' : 'O seu painel e os dos colegas. Os dos colegas abrem só para ver.') : 'O seu painel e os dos colegas. Nos dos colegas você pode ajudar, e tudo fica registrado no diário de cada processo.')
         : 'Quem tiver acesso para editar cria o primeiro perfil. Peça para a pessoa dona da página criar o dela.'}</p>
       <ul class="pessoas" aria-label="Painéis">
-        ${perfis.map((p, i) => `<li style="animation-delay:${i * 50}ms"><button type="button" class="pessoa" data-id="${p.id}" style="--c:${p.cor};--cbg:${p.bg}">${A.avatar(p, 'grande')}<span class="ini">${A.esc(p.ini)}${p.id === N.eu ? ' (você)' : ''}</span><span class="funcao">${A.esc(p.funcao || '')}</span></button></li>`).join('')}
+        ${perfis.map((p, i) => `<li style="animation-delay:${i * 50}ms"><button type="button" class="pessoa" data-id="${p.id}" style="--c:${p.cor};--cbg:${p.bg}">${A.avatar(p, 'grande')}<span class="ini">${A.esc(p.ini)}${p.id === N.eu ? ' (você)' : ''}</span><span class="funcao">${N.tipo === 'supabase' ? 'Servidor' : A.esc(p.funcao || '')}</span></button></li>`).join('')}
         ${!meu && podeCriar ? `<li><button type="button" class="pessoa nova" id="novaPessoa"><span class="avatar grande">${A.ic('mais')}</span><span class="ini">Criar o meu</span><span class="funcao">Perfil novo</span></button></li>` : ''}
       </ul></div>`;
     vista.querySelectorAll('.pessoa[data-id]').forEach(b => b.onclick = () => { A.entrarComo(b.dataset.id, acessoDe(b.dataset.id)); location.hash = '#/painel'; });
@@ -190,7 +190,7 @@
       <p class="secundario" style="margin-bottom:16px">Só as iniciais aparecem para os colegas. O nome completo não é pedido.</p>
       <div class="grade-campos">
         <div class="campo"><label for="cIni">Iniciais</label><input id="cIni" maxlength="8" placeholder="L.R." autocomplete="off"><div class="erro" hidden></div></div>
-        <div class="campo"><label for="cFun">Função</label><select id="cFun">${FUNCOES.map(f => `<option>${f}</option>`).join('')}</select></div>
+        ${A.nuvem.tipo === 'supabase' ? '' : `<div class="campo"><label for="cFun">Função</label><select id="cFun">${FUNCOES.map(f => `<option>${f}</option>`).join('')}</select></div>`}
       </div>
       <div class="form-botoes">${A.estado.perfis.length ? '<button class="btn btn-grande" type="button" id="cCancelar">Cancelar</button>' : ''}<button class="btn btn-primario btn-grande" type="submit">Criar meu perfil e entrar</button></div>
     </form>`;
@@ -206,9 +206,10 @@
       if (!ini) return erro('Escreva as suas iniciais.');
       if (!ini.includes('.')) ini = ini.split('').join('.') + '.';
       if (A.estado.perfis.some(p => p.ini === ini)) return erro('Já existe alguém com essas iniciais. Acrescente uma letra.');
-      const p = { id: A.nuvem.eu, ini, funcao: f.querySelector('#cFun').value, cor: cor[0], bg: cor[1], lembrete: { ativo: !!A.nuvem.dono, hora: '17:00' }, criadoEm: new Date().toISOString() };
+      const equipe = A.nuvem.tipo === 'supabase';
+      const p = { id: A.nuvem.eu, ini, funcao: equipe ? 'Servidor' : f.querySelector('#cFun').value, cor: cor[0], bg: cor[1], lembrete: { ativo: !equipe && !!A.nuvem.dono, hora: '17:00' }, criadoEm: new Date().toISOString() };
       A.estado.perfis.push(p);
-      A.estado.regras[p.id] = A.regrasPadrao();
+      A.estado.regras[p.id] = A.regrasNovas();
       A.salvarJa();
       criando = false;
       A.entrarComo(p.id, 'dono');
@@ -269,14 +270,15 @@
     const p = A.dono();
     if (A.sessao.acesso !== 'dono') { vista.innerHTML = `<main class="estreito"><h1>Perfil</h1><p class="aviso-suave" style="margin-top:16px">${A.ic('olho')} Só a pessoa dona do painel mexe no perfil.</p></main>`; return; }
     vista.innerHTML = `<main class="estreito">
-      <h1>Meu perfil e códigos</h1>
+      <h1>${A.semPlanilha() ? 'Meu perfil' : 'Meu perfil e códigos'}</h1>
       <form class="meu-perfil" id="fPerfil" novalidate style="margin-top:24px">
         <fieldset><legend>Como você aparece</legend>
           <div class="quem">${A.avatar(p, 'medio')}<div class="campo" style="flex:1"><label for="pIni">Iniciais</label><input id="pIni" value="${A.esc(p.ini)}" maxlength="8"></div></div>
-          <div class="campo" style="margin-top:12px"><label for="pFun">Função</label><select id="pFun">${FUNCOES.map(f => `<option ${p.funcao === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
+          ${A.semPlanilha() ? `<p class="secundario" style="margin-top:12px">Para a equipe você aparece como <strong>Servidor</strong>.</p>` : ''}
+          <div class="campo" style="margin-top:12px" ${A.semPlanilha() ? 'hidden' : ''}><label for="pFun">Função</label><select id="pFun">${FUNCOES.map(f => `<option ${p.funcao === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
           <p class="secundario" style="margin-top:12px">Em breve: escolher um desenho ou colocar uma foto pequena no lugar das iniciais.</p>
         </fieldset>
-        <fieldset><legend>Lembrete de fim de expediente</legend>
+        <fieldset ${A.semPlanilha() ? 'hidden' : ''}><legend>Lembrete de fim de expediente</legend>
           <label class="opcao"><input type="checkbox" id="pLemb" ${p.lembrete && p.lembrete.ativo ? 'checked' : ''}> Avisar para atualizar a planilha</label>
           <div class="campo" style="margin-top:8px"><label for="pHora">Horário (dias úteis)</label><input id="pHora" type="time" value="${A.esc((p.lembrete && p.lembrete.hora) || '17:00')}" style="max-width:140px"></div>
           <p class="secundario" style="margin-top:8px">O aviso aparece no topo do sistema, se ele estiver aberto, com quantas mudanças estão esperando.</p>
