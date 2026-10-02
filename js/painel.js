@@ -46,7 +46,7 @@
     const ativos = A.ativos();
     procs = ativos.map(p => ({ id: p.id, ref: p, titulo: p.titulo, sei: p.sei, evento: p.inicio || null, limite: p.inicio ? null : (p.limite || null), tipo: p.tipoNome, apoio: p.apoio }));
     P = Object.fromEntries(procs.map(x => [x.id, x]));
-    tarefas = ativos.flatMap(p => A.itensAtivos(p).map(({ f, i }) => ({ id: p.id + '|' + i.id, p: p.id, proc: p, item: i, f, o: i.nome, regra: A.regraTexto(i.regra), prazo: A.prazo(p, i), estado: i.estado, planilha: i.coluna || f.coluna })));
+    tarefas = ativos.flatMap(p => A.itensAtivos(p).filter(x => x.i.quem !== 'acompanha').map(({ f, i }) => ({ id: p.id + '|' + i.id, p: p.id, proc: p, item: i, f, o: i.nome, regra: A.regraTexto(i.regra), prazo: A.prazo(p, i), estado: i.estado, planilha: i.coluna || f.coluna })));
     despachos = ativos.flatMap(p => p.despachos.filter(a => !a.resposta).map(a => { const x = A.acharItem(p, a.itemId); return { ...a, ref: a, p: p.id, proc: p, item: x && x.i }; }));
   }
   const T = id => tarefas.find(t => t.id === id);

@@ -152,8 +152,18 @@
   A.regras = (perfilId) => {
     const id = perfilId || (A.sessao && A.sessao.perfilId);
     if (!A.estado.regras[id]) A.estado.regras[id] = A.regrasPadrao();
-    return A.estado.regras[id];
+    const r = A.estado.regras[id];
+    // regras antigas ganham os modelos novos (sem mexer no que a pessoa já ajustou)
+    if ((r.versaoModelo || 1) < 2 && A.MODELOS_V2) {
+      const tem = new Set(r.tipos.map(t => t.id));
+      r.tipos.unshift(...A.clonar(A.MODELOS_V2()).filter(t => !tem.has(t.id)));
+      r.versaoModelo = 2;
+    }
+    return r;
   };
+  /* Um passo do modelo vira um passo do processo */
+  A.itemDoModelo = pm => ({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref }, estado: 'aberta', coluna: pm.coluna || null,
+    na: false, editado: false, quem: pm.quem || 'faz', obrig: !!pm.obrig, ...(pm.setor ? { setor: pm.setor } : {}) });
   A.avatar = (p, cls = '') => p ? `<span class="avatar ${cls}" style="--c:${p.cor};--cbg:${p.bg}" aria-hidden="true">${A.esc(p.ini.replace(/\./g, ''))}</span>` : '';
 
   /* ---------- Processos ---------- */
@@ -353,7 +363,7 @@
     };
     proc.frentes = tipo.frentes.map(fm => ({
       id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna || null, na: !!fm.naPadrao,
-      itens: fm.passos.map(pm => ({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref }, estado: 'aberta', coluna: pm.coluna || null, na: false, editado: false })),
+      itens: fm.passos.map(A.itemDoModelo),
     }));
     A.aplicarAmbito(proc);
     A.anotar(proc, 'Sistema', proc.origem === 'planilha' ? 'Processo trazido da planilha.' : 'Processo criado no sistema.');

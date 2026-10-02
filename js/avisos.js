@@ -20,7 +20,7 @@
     A.ativos().forEach(p => {
       const pend = A.itensAtivos(p).filter(x => x.i.estado !== 'feita');
       pend.forEach(({ i }) => {
-        const prazo = A.prazo(p, i); if (!prazo || i.estado === 'esperando') return;
+        const prazo = A.prazo(p, i); if (!prazo || i.estado === 'esperando' || i.quem === 'acompanha') return;
         const d = A.dias(prazo);
         if (/cobrar.*certificad/i.test(A.semAcento(i.nome)) && d <= 0)
           lista.push({ id: `cobrar:${p.id}:${i.id}`, tipo: 'cobrar', p, texto: `Já passaram 15 dias do evento e o certificado não foi marcado como apresentado. Cobre do servidor${p.apoio ? ' (' + p.apoio + ')' : ''}.` });

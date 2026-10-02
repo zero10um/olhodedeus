@@ -4,11 +4,98 @@
   const passo = (id, nome, dias, quando, ref, coluna) => ({ id, nome, dias, quando, ref, coluna: coluna || null });
   const frente = (id, nome, fase, icone, coluna, passos, naPadrao) => ({ id, nome, fase, icone, coluna: coluna || null, naPadrao: !!naPadrao, passos });
 
+  /* Modelos da versão 2 (out/2026), tirados de dois processos reais:
+     - quem: 'faz' = tarefa do pedagógico; 'acompanha' = marco de outra unidade (só confere se chegou)
+     - obrig: passo que não pode ser marcado "não se aplica" sem motivo */
+  const ac = (id, nome, dias, quando, ref, extra) => Object.assign(passo(id, nome, dias, quando, ref), { quem: 'acompanha' }, extra || {});
+  const ob = (id, nome, dias, quando, ref, extra) => Object.assign(passo(id, nome, dias, quando, ref), { obrig: true }, extra || {});
+  const freqECertificados = (pre, emite) => [
+    ob(pre + 'f1', 'Fechar a lista de frequência', 2, 'depois', 'fim'),
+    emite === 'contratada' ? ob(pre + 'f2', 'Conferir os certificados entregues pela contratada', 10, 'depois', 'fim', { coluna: 'Certificados emitidos' })
+      : ob(pre + 'f2', 'Emitir os certificados', 10, 'depois', 'fim', { coluna: 'Certificados emitidos' }),
+    passo(pre + 'f3', 'Atualizar a planilha de exonerados', 5, 'depois', 'fim', 'Planilha de exonerados'),
+  ];
+  const apoioDasUnidades = pre => frente('local', 'Apoio das unidades (SEI de apoio)', 'prep', 'predio', null, [
+    ob(pre + 'a1', 'Abrir o SEI de apoio das unidades', 40, 'antes', 'inicio'),
+    ob(pre + 'a2', 'Reservar a sala ou o auditório', 35, 'antes', 'inicio'),
+    passo(pre + 'a3', 'Pedir o apoio técnico (formulário)', 20, 'antes', 'inicio'),
+    passo(pre + 'a4', 'Pedir o coffee break à GCI', 20, 'antes', 'inicio'),
+  ]);
+  const comunicacao = pre => frente('comunicacao', 'Comunicação e inscrições', 'prep', 'megafone', 'Setor de comunicação', [
+    ob(pre + 'm1', 'Enviar o briefing à comunicação', 30, 'antes', 'inicio'),
+    passo(pre + 'm2', 'Aprovar as artes', 21, 'antes', 'inicio'),
+    ob(pre + 'm3', 'Abrir as inscrições', 14, 'antes', 'inicio'),
+    passo(pre + 'm4', 'Fechar a lista de inscritos e avisar quem vai ministrar', 2, 'antes', 'inicio'),
+  ]);
+  const deslocamento = (pre, na) => frente('deslocamento', 'Deslocamento (formulário de deslocamento)', 'prep', 'aviao', 'Deslocamento / Portaria', [
+    passo(pre + 'd1', 'Receber o formulário de deslocamento', 30, 'antes', 'inicio'),
+    passo(pre + 'd2', 'Pedir a portaria ao DA', 25, 'antes', 'inicio'),
+    ac(pre + 'd3', 'Portaria aprovada pelo DA', 20, 'antes', 'inicio', { setor: 'DA' }),
+    passo(pre + 'd4', 'Enviar ao setor financeiro para passagens e diárias', 18, 'antes', 'inicio'),
+    ac(pre + 'd5', 'Passagens e diárias compradas', 10, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+  ], na);
+
+  const MODELOS_V2 = () => [
+    { id: 'capacitacao', nome: 'Capacitação com contratação externa', ref: 'evento', aprovacao: true, frentes: [
+      frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
+        ob('k1', 'Confirmar que está no Programa de Capacitação', 70, 'antes', 'inicio'),
+        ob('k2', 'Receber a proposta (formato, turmas, datas, conteúdo)', 70, 'antes', 'inicio'),
+      ]),
+      frente('contratacao', 'Contratação (setor financeiro da EMPRO)', 'prep', 'contrato', null, [
+        ob('k3', 'Pedir o DFD à unidade demandante', 65, 'antes', 'inicio'),
+        ob('k4', 'Enviar a demanda ao setor financeiro da EMPRO', 60, 'antes', 'inicio'),
+        ac('k5', 'DFD e TR prontos', 55, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+        ac('k6', 'DAC analisou e lançou no THEMA', 50, 'antes', 'inicio', { setor: 'DAC' }),
+        ac('k7', 'Reserva no FUNDIMPER e confirmação da DOF', 45, 'antes', 'inicio', { setor: 'DOF', coluna: 'FUNDIMPER' }),
+        ac('k8', 'Autorização da DA', 40, 'antes', 'inicio', { setor: 'DA' }),
+        ac('k9', 'Inexigibilidade publicada no PNCP', 30, 'antes', 'inicio', { setor: 'DAC' }),
+        ac('k10', 'Nota de Empenho emitida', 20, 'antes', 'inicio', { setor: 'DA', obrig: true }),
+        ob('k11', 'Avisar o fornecedor que está contratado', 15, 'antes', 'inicio'),
+      ]),
+      apoioDasUnidades('k'), comunicacao('k'), deslocamento('k', true),
+      frente('pos', 'Pós-evento', 'pos', 'certificado', null, [
+        ...freqECertificados('k', 'contratada'),
+        ob('k12', 'Atestar a execução do curso', 5, 'depois', 'fim'),
+        ac('k13', 'Liquidação e pagamento', 30, 'depois', 'fim', { setor: 'Setor financeiro (EMPRO)' }),
+      ]),
+      frente('encerramento', 'Encerramento', 'fim', 'arquivo', null, [
+        passo('k14', 'Conferir se está tudo pago e arquivar', 40, 'depois', 'fim'),
+      ]),
+    ] },
+    { id: 'acao-equipe', nome: 'Ação executada pela equipe', ref: 'evento', aprovacao: true, frentes: [
+      frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
+        ob('e1', 'Confirmar que está no planejamento', 60, 'antes', 'inicio'),
+        ob('e2', 'Definir datas, locais e público', 50, 'antes', 'inicio'),
+      ]),
+      apoioDasUnidades('e'), comunicacao('e'), deslocamento('e', false),
+      frente('pos', 'Pós-evento', 'pos', 'certificado', null, freqECertificados('e', 'escola')),
+      frente('encerramento', 'Encerramento', 'fim', 'arquivo', null, [passo('e9', 'Arquivar o processo', 30, 'depois', 'fim')]),
+    ] },
+    { id: 'evento-externo', nome: 'Participação em evento externo', ref: 'evento', aprovacao: false, frentes: [
+      frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
+        ob('x1', 'Receber o pedido do servidor (evento, datas, local)', 45, 'antes', 'inicio'),
+        ac('x2', 'Autorização da participação', 35, 'antes', 'inicio', { setor: 'PGJ' }),
+      ]),
+      frente('financeira', 'Inscrição', 'prep', 'moeda', 'Instrução financeira', [
+        ob('x3', 'Enviar ao setor financeiro o pagamento da inscrição', 25, 'antes', 'inicio'),
+        ac('x4', 'Inscrição paga', 15, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+      ]),
+      deslocamento('x', false),
+      frente('pos', 'Certificado', 'pos', 'certificado', null, [
+        ob('x5', 'Avisar o servidor: o certificado será cobrado em 15 dias', 1, 'depois', 'fim'),
+        ob('x6', 'Cobrar o certificado do servidor', 15, 'depois', 'fim'),
+        ob('x7', 'Conferir o certificado apresentado', 20, 'depois', 'fim', { coluna: 'Certificados apresentados' }),
+      ]),
+    ] },
+  ];
+
+  A.MODELOS_V2 = MODELOS_V2;
   A.regrasPadrao = () => A.clonar({
-    versaoModelo: 1,
+    versaoModelo: 2,
     limites: { critico: 7, atencao: 15, vencendo: 3 },
     tipos: [
-      { id: 'curso', nome: 'Curso/Evento', ref: 'evento', aprovacao: true, frentes: [
+      ...MODELOS_V2(),
+      { id: 'curso', nome: 'Curso/Evento (modelo antigo)', ref: 'evento', aprovacao: true, frentes: [
         frente('instrucao', 'Instrução do processo', 'inicio', 'pasta', 'Instrução do processo', [
           passo('c1', 'Conferir se a ação está prevista no plano', 60, 'antes', 'inicio'),
           passo('c2', 'Abrir o processo no SEI e juntar a demanda', 60, 'antes', 'inicio'),
@@ -19,7 +106,9 @@
         frente('contratacao', 'Contratação', 'prep', 'contrato', null, [
           passo('c6', 'Elaborar o DFD', 50, 'antes', 'inicio'),
           passo('c7', 'Elaborar o TR', 45, 'antes', 'inicio'),
-          passo('c8', 'Conferir o contrato assinado', 15, 'antes', 'inicio')]),
+          passo('c8', 'Conferir a Nota de Empenho', 15, 'antes', 'inicio'),
+          ac('c21', 'Lançado no THEMA', 50, 'antes', 'inicio', { setor: 'DAC', coluna: 'THEMA' }),
+          ac('c22', 'Reserva no FUNDIMPER', 45, 'antes', 'inicio', { setor: 'DOF', coluna: 'FUNDIMPER' })]),
         frente('deslocamento', 'Deslocamento e portaria', 'prep', 'aviao', 'Deslocamento / Portaria', [
           passo('c9', 'Pedir passagens e diárias', 30, 'antes', 'inicio'),
           passo('c10', 'Conferir a publicação da portaria', 10, 'antes', 'inicio')]),
@@ -36,9 +125,8 @@
           passo('c18', 'Conferir os certificados apresentados', 10, 'depois', 'fim', 'Certificados apresentados'),
           passo('c19', 'Emitir os certificados', 10, 'depois', 'fim', 'Certificados emitidos'),
           passo('c20', 'Conferir pagamento e liquidação do empenho', 20, 'depois', 'fim')]),
-        frente('encerramento', 'Lançamentos finais', 'fim', 'arquivo', null, [
-          passo('c21', 'Lançar no FUNDIMPER', 25, 'depois', 'fim', 'FUNDIMPER'),
-          passo('c22', 'Lançar no THEMA', 30, 'depois', 'fim', 'THEMA')]),
+        frente('encerramento', 'Encerramento', 'fim', 'arquivo', null, [
+          passo('c23', 'Conferir se está tudo pago e arquivar', 40, 'depois', 'fim')]),
       ] },
       { id: 'certificacao', nome: 'Certificação', ref: 'limite', aprovacao: false, frentes: [
         frente('instrucao', 'Instrução do processo', 'inicio', 'pasta', 'Instrução do processo', [passo('ce1', 'Instruir o processo', 10, 'antes', 'limite')]),
@@ -85,13 +173,14 @@
       tipo.frentes.forEach(fm => {
         let f = proc.frentes.find(x => x.modeloId === fm.id);
         if (!f) { f = { id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna, na: !!fm.naPadrao, itens: [] }; proc.frentes.push(f); mexeu = true; }
-        fm.passos.forEach(pm => {
+        for (const pm of fm.passos) {
           const i = f.itens.find(x => x.modeloId === pm.id);
-          if (!i) { f.itens.push({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref }, estado: 'aberta', coluna: pm.coluna, na: false, editado: false }); novos++; mexeu = true; }
-          else if (!i.editado && (i.regra.dias !== +pm.dias || i.regra.quando !== pm.quando || i.regra.ref !== pm.ref || i.nome !== pm.nome)) {
+          if (!i) { f.itens.push(A.itemDoModelo(pm)); novos++; mexeu = true; continue; }
+          i.quem = pm.quem || 'faz'; i.obrig = !!pm.obrig; if (pm.setor) i.setor = pm.setor;
+          if (!i.editado && (i.regra.dias !== +pm.dias || i.regra.quando !== pm.quando || i.regra.ref !== pm.ref || i.nome !== pm.nome)) {
             i.regra = { dias: +pm.dias, quando: pm.quando, ref: pm.ref }; i.nome = pm.nome; prazos++; mexeu = true;
           }
-        });
+        }
       });
       if (mexeu) { procs++; A.anotar(proc, 'Sistema', 'Regras de prazo atualizadas.'); }
     });
@@ -102,6 +191,25 @@
   let tipoSel = null, ultima = null;
   const FASES_OP = () => A.FASES.filter(f => f.id !== 'evento');
   const ICONES_OP = { pasta: 'Pasta', moeda: 'Dinheiro', contrato: 'Contrato', aviao: 'Viagem', predio: 'Local', megafone: 'Comunicação', certificado: 'Certificado', arquivo: 'Arquivo', pessoa: 'Pessoa', lista: 'Lista' };
+
+  /* A régua: todos os prazos do tipo em ordem, do mais cedo ao mais tarde, com o dia do evento no meio */
+  function reguaHTML(tipo, dis) {
+    const ev = tipo.ref === 'evento';
+    const linhas = tipo.frentes.flatMap((f, fi) => f.passos.map((p, pi) => ({ f, fi, p, pi, off: p.ref === 'entrada' ? -999 : (p.quando === 'antes' ? -1 : 1) * (+p.dias || 0) + (p.ref === 'fim' ? 0.5 : 0) })))
+      .sort((a, b) => a.off - b.off);
+    const linha = x => `<li class="rg-l${x.p.quem === 'acompanha' ? ' acomp' : ''}${x.p.obrig ? ' obrig' : ''}">
+        <span class="rg-d"><input class="cel numero" type="number" min="0" max="365" data-k="p:${x.fi}:${x.pi}:dias" value="${x.p.dias}" aria-label="Dias para ${A.esc(x.p.nome)}" ${dis}>
+          <select class="cel" data-k="p:${x.fi}:${x.pi}:quando" aria-label="Antes ou depois" ${dis}><option value="antes" ${x.p.quando === 'antes' ? 'selected' : ''}>antes</option><option value="depois" ${x.p.quando === 'depois' ? 'selected' : ''}>depois</option></select></span>
+        <span class="rg-n">${A.esc(x.p.nome)}<small>${A.esc(x.f.nome)}${x.p.ref === 'fim' ? ' · conta do fim' : x.p.ref === 'entrada' ? ' · conta da chegada ao setor' : ''}</small></span>
+        <span class="rg-tags">${x.p.quem === 'acompanha' ? `<span class="tag tag-marco">acompanhar${x.p.setor ? ' · ' + A.esc(x.p.setor) : ''}</span>` : '<span class="tag tag-faz">você faz</span>'}${x.p.obrig ? '<span class="tag tag-obrig">obrigatório</span>' : ''}</span></li>`;
+    const antes = linhas.filter(x => x.off < 0), depois = linhas.filter(x => x.off >= 0);
+    return `<section class="regua-prazos" aria-labelledby="rg-regua">
+      <div class="rg-topo"><h2 id="rg-regua">Os prazos, em ordem</h2><p class="secundario">Mude os dias aqui mesmo: salva sozinho. Em azul o que você faz; em cinza o que você só acompanha.</p></div>
+      <ol class="rg-lista">${antes.map(linha).join('')}
+        <li class="rg-dia" aria-label="${ev ? 'Dia do evento' : 'Data limite'}"><span>${ev ? 'Dia do evento' : 'Data limite'}</span></li>
+        ${depois.map(linha).join('')}</ol>
+    </section>`;
+  }
 
   A.telaRegras = vista => {
     const reg = A.regras(), pode = A.podeEditar() && A.sessao.acesso === 'dono';
@@ -128,6 +236,8 @@
             </div>
             <h2 id="rg-t" class="sr">Frentes e passos de ${A.esc(tipo.nome)}</h2>
           </section>
+          ${reguaHTML(tipo, dis)}
+          <details class="rg-editar"${A.prefs().rgEditarAberto ? ' open' : ''}><summary>Editar grupos e passos: nomes, ordem, quem faz, obrigatório</summary>
           ${tipo.frentes.map((f, fi) => {
             const [c, bg] = A.ICONES[f.icone] || A.ICONES.lista;
             return `<section class="regra-frente" style="margin-top:12px" aria-label="Frente ${A.esc(f.nome)}">
@@ -140,19 +250,21 @@
                 <label>Ícone <select data-k="f:${fi}:icone" ${dis}>${Object.entries(ICONES_OP).map(([k, n]) => `<option value="${k}" ${f.icone === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
                 <label class="chave"><input type="checkbox" data-k="f:${fi}:naPadrao" ${f.naPadrao ? 'checked' : ''} ${dis}> Começa como "não se aplica"</label>
               </div>
-              <div class="passo-regra cabec" aria-hidden="true"><span>Passo</span><span>Dias</span><span>Antes ou depois</span><span>De quê</span><span>Coluna própria</span><span></span></div>
+              <div class="passo-regra cabec" aria-hidden="true"><span>Passo</span><span>Dias</span><span>Antes ou depois</span><span>De quê</span><span>Quem</span><span></span></div>
               ${f.passos.map((p, pi) => `<div class="passo-regra">
                 <input class="cel" data-k="p:${fi}:${pi}:nome" value="${A.esc(p.nome)}" aria-label="Nome do passo" ${dis}>
                 <input class="cel numero" type="number" min="0" max="365" data-k="p:${fi}:${pi}:dias" value="${p.dias}" aria-label="Dias para ${A.esc(p.nome)}" ${dis}>
                 <select class="cel" data-k="p:${fi}:${pi}:quando" aria-label="Antes ou depois" ${dis}><option value="antes" ${p.quando === 'antes' ? 'selected' : ''}>antes</option><option value="depois" ${p.quando === 'depois' ? 'selected' : ''}>depois</option></select>
                 <select class="cel col-ref" data-k="p:${fi}:${pi}:ref" aria-label="A partir de" ${dis}>${refsOp.map(([v, n]) => `<option value="${v}" ${p.ref === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
-                <select class="cel col-col" data-k="p:${fi}:${pi}:coluna" aria-label="Coluna própria na planilha" ${dis}><option value="">a da frente</option>${A.COLUNAS.map(col => `<option ${p.coluna === col ? 'selected' : ''}>${col}</option>`).join('')}</select>
+                <span class="rg-quem"><select class="cel" data-k="p:${fi}:${pi}:quem" aria-label="Quem faz ${A.esc(p.nome)}" ${dis}><option value="faz" ${p.quem !== 'acompanha' ? 'selected' : ''}>você faz</option><option value="acompanha" ${p.quem === 'acompanha' ? 'selected' : ''}>acompanha</option></select>
+                  <label class="chave"><input type="checkbox" data-k="p:${fi}:${pi}:obrig" ${p.obrig ? 'checked' : ''} ${dis}> obrigatório</label></span>
                 ${pode ? `<button type="button" class="btn-icone" data-tirar-p="${fi}:${pi}" aria-label="Tirar o passo ${A.esc(p.nome)}">${A.ic('lixo')}</button>` : '<span></span>'}
               </div>`).join('')}
               ${pode ? `<button type="button" class="btn-texto" data-novo-p="${fi}" style="margin-top:6px">${A.ic('mais', 'ic-sm')}Adicionar passo</button>` : ''}
             </section>`;
           }).join('')}
           ${pode ? `<div class="form-botoes" style="margin-top:12px"><button type="button" class="btn" id="rgNovaFrente">${A.ic('mais')}Adicionar frente</button></div>` : ''}
+          </details>
 
           <section class="bloco" style="margin-top:24px" aria-labelledby="rg-aplicar">
             <h2 id="rg-aplicar" style="font-size:18px">Levar para os processos em andamento</h2>
@@ -175,6 +287,7 @@
     </main>`;
 
     const corpo = vista.querySelector('#rgCorpo');
+    const ed = corpo.querySelector('.rg-editar'); if (ed) ed.ontoggle = () => { A.prefs().rgEditarAberto = ed.open; A.salvar(); };
     vista.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { tipoSel = b.dataset.tipo; ultima = null; A.mudar(A.redesenhar); });
     if (!pode) return;
     const mudou = (desc, desfazer) => { ultima = { desc, desfazer }; A.salvar(); A.comFoco(A.redesenhar); };

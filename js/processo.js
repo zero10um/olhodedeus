@@ -6,8 +6,8 @@
     { v: 'ficha', t: 'Ficha em tabela', d: 'Tudo numa tabela, como a planilha. Edite direto: salva sozinho.', ic: 'v-tabela' },
   ];
   const ESTADOS = [['aberta', 'A fazer'], ['esperando', 'Esperando resposta'], ['feita', 'Feito']];
-  const TIPOS_SEI = ['Deslocamento', 'Portaria', 'DFD', 'TR', 'Contratação', 'Coffee break', 'Comarcas', 'Apoio', 'Pagamento', 'Certificados', 'Outro'];
-  const tipoSeiDe = nome => { const n = A.semAcento(nome); return /coffee/.test(n) ? 'Coffee break' : /comarca/.test(n) ? 'Comarcas' : /dfd/.test(n) ? 'DFD' : /\btr\b/.test(n) ? 'TR' : /contrat/.test(n) ? 'Contratação' : /diaria|passag|desloc/.test(n) ? 'Deslocamento' : /portaria/.test(n) ? 'Portaria' : /certific/.test(n) ? 'Certificados' : /pagam|empenh/.test(n) ? 'Pagamento' : 'Outro'; };
+  const TIPOS_SEI = ['Apoio das unidades', 'Formulário de deslocamento', 'Deslocamento', 'Portaria', 'DFD', 'TR', 'Contratação', 'Coffee break', 'Comarcas', 'Apoio', 'Pagamento', 'Certificados', 'Outro'];
+  const tipoSeiDe = nome => { const n = A.semAcento(nome); return /apoio das unidades|sei de apoio/.test(n) ? 'Apoio das unidades' : /formulario de deslocamento/.test(n) ? 'Formulário de deslocamento' : /coffee/.test(n) ? 'Coffee break' : /comarca/.test(n) ? 'Comarcas' : /dfd/.test(n) ? 'DFD' : /\btr\b/.test(n) ? 'TR' : /contrat/.test(n) ? 'Contratação' : /diaria|passag|desloc/.test(n) ? 'Deslocamento' : /portaria/.test(n) ? 'Portaria' : /certific/.test(n) ? 'Certificados' : /pagam|empenh/.test(n) ? 'Pagamento' : 'Outro'; };
   const SUB_FASE = { inicio: 'Ver se estava previsto, abrir o processo e dar o primeiro despacho.', prep: 'Depois de aprovado, cada frente anda ao mesmo tempo, com seu próprio despacho.', evento: '', pos: 'Depois do evento: certificados, exonerados e pagamentos.', fim: 'Os últimos lançamentos antes de fechar o processo.' };
 
   let proc = null, vistaEl = null;
@@ -49,6 +49,10 @@
 
   /* ---------- Ações ---------- */
   function marcar(f, i, feita) {
+    if (feita && /^abrir o sei/.test(A.semAcento(i.nome))) {
+      const n = prompt(`Qual o número do SEI? (opcional)\n\n${i.nome}`);
+      if (n && n.trim()) proc.seis.push({ id: 's' + A.uid(), tipo: tipoSeiDe(i.nome), numero: A.seiGuardar(n.trim()), desc: i.nome, f: f.id });
+    }
     const desfaz = A.setEstado(proc, i, feita ? 'feita' : 'aberta');
     if (feita) A.anotar(proc, 'Feito', i.nome + '.');
     salvarE();
@@ -88,11 +92,13 @@
     const p = prazo(i), n = p ? A.dias(p) : null;
     const cls = i.estado !== 'aberta' || n === null ? '' : n < 0 ? 'atrasado' : n === 0 ? 'hoje' : '';
     const desp = A.despachoAberto(proc, i);
-    return `<li class="tarefa${i.estado === 'feita' ? ' feita' : ''}" data-i="${i.id}" style="view-transition-name:t-${i.id}">
-      <input type="checkbox" id="cb-${i.id}" ${i.estado === 'feita' ? 'checked' : ''} ${bloqueada ? 'disabled' : ''}>
-      <label class="o-que" for="cb-${i.id}">${A.esc(i.nome)}</label>
-      <span class="prazo ${cls}" title="${A.esc(A.regraTexto(i.regra))}">${quando(i)}</span>
-      ${bloqueada ? '' : `<div class="linha2">${i.estado === 'aberta' ? `<button type="button" class="btn-texto" data-despachar="${i.id}">${A.ic('enviar', 'ic-sm')}Despachei</button>` : ''}<button type="button" class="btn-texto" data-editar-passo="${i.id}" aria-expanded="${editandoPasso === i.id}">${A.ic('lapis', 'ic-sm')}Editar</button>${(i.coluna || f.coluna) && i.estado === 'aberta' ? `<span>Vai para a coluna "${i.coluna || f.coluna}"</span>` : ''}</div>`}
+    const marco = i.quem === 'acompanha';
+    const tags = `${marco ? `<span class="tag tag-marco">acompanhar${i.setor ? ' · ' + A.esc(i.setor) : ''}</span>` : ''}${i.obrig ? '<span class="tag tag-obrig">obrigatório</span>' : ''}`;
+    return `<li class="tarefa${i.estado === 'feita' ? ' feita' : ''}${marco ? ' marco' : ''}" data-i="${i.id}" style="view-transition-name:t-${i.id}">
+      <input type="checkbox" id="cb-${i.id}" ${i.estado === 'feita' ? 'checked' : ''} ${bloqueada ? 'disabled' : ''} ${marco ? `aria-label="${A.esc(i.nome)}: já aconteceu?"` : ''}>
+      <label class="o-que" for="cb-${i.id}">${A.esc(i.nome)}${tags ? ` <span class="tags">${tags}</span>` : ''}</label>
+      <span class="prazo ${cls}" title="${A.esc(A.regraTexto(i.regra))}">${marco && i.estado !== 'feita' ? (p ? 'previsto até ' + A.fmt(p) : 'sem data') : quando(i)}</span>
+      ${bloqueada ? '' : `<div class="linha2">${i.estado === 'aberta' && !marco ? `<button type="button" class="btn-texto" data-despachar="${i.id}">${A.ic('enviar', 'ic-sm')}Despachei</button>` : ''}<button type="button" class="btn-texto" data-editar-passo="${i.id}" aria-expanded="${editandoPasso === i.id}">${A.ic('lapis', 'ic-sm')}Editar</button>${(i.coluna || f.coluna) && i.estado === 'aberta' ? `<span>Vai para a coluna "${i.coluna || f.coluna}"</span>` : ''}</div>`}
       ${desp ? `<div class="esperando-linha"><span>${A.ic('relogio', 'ic-sm')} Esperando <strong>${A.esc(desp.setor)}</strong> desde ${A.fmt(desp.enviado)} (${A.haDias(-A.dias(desp.enviado))})</span>${desp.texto ? `<span>${A.esc(desp.texto)}</span>` : ''}${pode() ? `<button type="button" class="btn-texto" data-resposta="${desp.id}">${A.ic('check', 'ic-sm')}Chegou resposta</button>` : ''}</div>` : ''}
       ${formDespacho === i.id ? formDespachoHTML(i) : ''}
       ${editandoPasso === i.id ? editorHTML(i) : ''}
@@ -104,6 +110,7 @@
       <div class="dois"><div class="campo"><label for="fs-${i.id}">Enviado para</label><input id="fs-${i.id}" name="setor" list="lista-setores" value="${A.esc(palpiteSetor(i))}" placeholder="GCI"><div class="erro" hidden>Diga para onde o despacho foi.</div></div>
         <div class="campo"><label for="fd-${i.id}">Enviado em</label><input id="fd-${i.id}" name="data" type="date" value="${A.hojeIso()}" max="${A.hojeIso()}"></div></div>
       <div class="campo"><label for="ft-${i.id}">O que foi pedido ou combinado <small>(opcional)</small></label><textarea id="ft-${i.id}" name="texto"></textarea></div>
+      ${(() => { const fr = (I(i.id) || {}).f, ap = proc.seis.find(s => s.tipo === 'Apoio das unidades'); return ap && fr && ['local', 'comunicacao'].includes(fr.modeloId) ? `<p class="secundario">Este pedido vai no SEI de apoio das unidades: <strong>${A.esc(ap.numero)}</strong>.</p>` : ''; })()}
       <div class="campo"><label for="fsei-${i.id}">Abriu um SEI relacionado para isso? <small>(opcional: cole o número)</small></label><input id="fsei-${i.id}" name="seiRel" placeholder="19.25.000000000.0000000/2026-00"></div>
       <div class="form-botoes"><button class="btn btn-primario" type="submit">Salvar e esperar resposta</button><button class="btn" type="button" data-cancelar>Cancelar</button></div>
     </form>`;
@@ -319,6 +326,24 @@
         </div><div id="novo-${f.id}"></div>
       </div></div></div></article>`;
   }
+  /* ---------- "Agora": o que está com você e o que espera outras unidades, nesta fase ---------- */
+  function agoraHTML(fa) {
+    const frs = proc.frentes.filter(f => f.fase === fa.id && !f.na);
+    const pend = frs.filter(f => !A.travada(proc, f)).flatMap(f => f.itens.filter(i => !i.na && i.estado !== 'feita').map(i => ({ f, i, p: prazo(i) || '9999' })));
+    const faz = pend.filter(x => x.i.quem !== 'acompanha').sort((a, b) => a.p < b.p ? -1 : 1).slice(0, 3);
+    const marcos = frs.flatMap(f => f.itens.filter(i => !i.na && i.quem === 'acompanha'));
+    if (!faz.length && !marcos.length) return '';
+    const chegou = marcos.filter(i => i.estado === 'feita').length, prox = marcos.find(i => i.estado !== 'feita');
+    return `<section class="agora" aria-label="Agora nesta fase">
+      <div class="agora-col"><h3 class="agora-rot">Agora, com você</h3>
+        ${faz.length ? `<ol>${faz.map(x => `<li><button type="button" class="link-proc" data-ir-passo="${x.f.id}|${x.i.id}">${A.esc(x.i.nome)}</button><span class="prazo">${quando(x.i)}</span></li>`).join('')}</ol>` : '<p class="secundario">Nada com você nesta fase.</p>'}</div>
+      ${marcos.length ? `<div class="agora-col"><h3 class="agora-rot">Esperando outras unidades</h3>
+        <p class="agora-n"><strong>${chegou} de ${marcos.length}</strong> marcos já aconteceram</p>
+        <div class="agora-barra" aria-hidden="true"><i style="transform:scaleX(${chegou / marcos.length})"></i></div>
+        ${prox ? `<p class="secundario">Próximo: <strong>${A.esc(prox.nome)}</strong>${prox.setor ? ` (${A.esc(prox.setor)})` : ''}</p>` : '<p class="secundario">Tudo chegou.</p>'}</div>` : ''}
+    </section>`;
+  }
+
   /* ---------- Roteiro: vários lugares e dias dentro do mesmo evento ---------- */
   function roteiroHTML() {
     const r = proc.roteiro || [], dis = pode() ? '' : 'disabled';
@@ -408,7 +433,7 @@
         const nPassos = fr.reduce((s, f) => s + f.itens.filter(x => !x.na).length, 0);
         corpo = A.guiaHTML(proc, pode()) + `<details class="guia-lista"${A.prefs().guiaListaAberta ? ' open' : ''}><summary>Ver todos os passos do início (${nPassos})</summary>${portaoHTML()}<div class="frentes">${fr.map(frenteHTML).join('')}</div></details>`;
       }
-      else corpo = (fa.id === 'inicio' ? portaoHTML() : '') + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>`;
+      else corpo = (fa.id === 'inicio' ? portaoHTML() : '') + agoraHTML(fa) + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>`;
       return `<section class="fase" id="fase-${fa.id}" aria-labelledby="h-${fa.id}"><div class="fase-topo"><h2 id="h-${fa.id}">${i + 1}. ${fa.n}</h2>${SUB_FASE[fa.id] ? `<p class="secundario">${SUB_FASE[fa.id]}</p>` : ''}</div>${corpo}</section>`;
     }).join('')
       + (uma ? `<nav class="fase-nav" aria-label="Trocar de fase">
@@ -420,6 +445,12 @@
     el.querySelectorAll('[data-fase]').forEach(b => b.onclick = () => irParaFase(b.dataset.fase));
     el.querySelector('#todasFases').onclick = () => { A.prefs().todasFases = !A.prefs().todasFases; A.salvar(); desenharCaminho(); desenharConteudo(); };
     ligarRoteiro(el);
+    el.querySelectorAll('[data-ir-passo]').forEach(b => b.onclick = () => {
+      const [fid, iid] = b.dataset.irPasso.split('|');
+      abertas.add(fid); desenharConteudo();
+      const li = vistaEl.querySelector(`[data-i="${iid}"]`);
+      if (li) { A.rolarAte(li); li.classList.add('brilho'); setTimeout(() => li.classList.remove('brilho'), 1600); const cb = li.querySelector('input'); if (cb) cb.focus({ preventScroll: true }); }
+    });
     const gl = el.querySelector('.guia-lista'); if (gl) gl.ontoggle = () => { A.prefs().guiaListaAberta = gl.open; A.salvar(); };
     const guia = el.querySelector('.guia');
     if (guia) A.guiaLigar(guia, proc, { redesenhar: () => { faseVista = 'inicio'; A.salvar(); desenhar(); }, irParaFase: id => { desenharTopo(); irParaFase(id); } });
@@ -458,6 +489,11 @@
     });
     el.querySelectorAll('[data-na]').forEach(cb => cb.onchange = () => {
       const f = F(cb.dataset.na), antes = f.na;
+      if (cb.checked && f.itens.some(i => i.obrig && !i.na)) {
+        const motivo = prompt(`"${f.nome}" tem passo obrigatório. Por que não se aplica a este processo?`);
+        if (!motivo || !motivo.trim()) { cb.checked = false; return; }
+        A.anotar(proc, 'Sistema', `${f.nome}: não se aplica. Motivo: ${motivo.trim()}`);
+      }
       f.na = cb.checked; if (f.na) abertas.delete(f.id); else abertas.add(f.id);
       A.anotar(proc, 'Sistema', `${f.nome}: ${f.na ? 'marcada como não se aplica' : 'voltou a fazer parte do processo'}.`);
       salvarE();
