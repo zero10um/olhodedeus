@@ -148,7 +148,7 @@
   /* ---------- Topo ---------- */
   function desenharTopo() {
     const s = A.situacao(proc), el = vistaEl;
-    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
+    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}${!proc.arquivado && A.conflitosSala(proc).length ? `<span class="selo" style="--c:var(--critico);--cbg:var(--critico-bg)" title="${A.esc(A.conflitosSala(proc).map(A.textoConflito).join(' '))}">${A.ic('alerta')}Conflito de sala</span>` : ''}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
     el.querySelector('#titulo').textContent = proc.titulo;
     el.querySelector('#trilhaTitulo').textContent = proc.titulo;
     document.title = `${proc.titulo} — Meus processos`;
@@ -182,7 +182,7 @@
     ['local', 'Local', 'text', 'largo'], ['apoio', 'Apoio (nome; aparece só com as iniciais)', 'text', 'largo'], ['observacoes', 'Observações', 'textarea', 'largo'],
   ];
   function campoHTML([k, rot, tipo, cls, ops], prefixo, ficha) {
-    const id = prefixo + k, at = `id="${id}" name="${k}" ${ficha ? `class="cel" data-k="dado:${k}"` : ''} ${pode() ? '' : 'disabled'}`;
+    const id = prefixo + k, at = `id="${id}" name="${k}" ${ficha ? `class="cel" data-k="dado:${k}"` : ''} ${k === 'local' ? 'list="lista-salas" autocomplete="off"' : ''} ${pode() ? '' : 'disabled'}`;
     const ctl = tipo === 'select' ? `<select ${at}>${ops.map(([v, n]) => `<option value="${A.esc(v)}" ${(proc[k] || '') === v ? 'selected' : ''}>${A.esc(n)}</option>`).join('')}</select>`
       : tipo === 'textarea' ? `<textarea ${at}>${A.esc(proc[k] || '')}</textarea>` : `<input ${at} type="${tipo}" value="${A.esc(proc[k] || '')}">`;
     return `<div class="campo ${cls || ''}"><label for="${id}">${rot}</label>${ctl}<div class="erro" hidden></div></div>`;
@@ -245,7 +245,8 @@
       A.anotar(proc, 'Sistema', 'Dados do processo alterados.');
       editandoDados = false;
       salvarE();
-      A.avisar('Dados salvos. Os prazos foram recalculados.', () => { Object.keys(proc).forEach(k => delete proc[k]); Object.assign(proc, antes); });
+      const conf = A.conflitosSala(proc);
+      A.avisar(conf.length ? `Dados salvos, mas atenção: ${A.textoConflito(conf[0])}` : 'Dados salvos. Os prazos foram recalculados.', () => { Object.keys(proc).forEach(k => delete proc[k]); Object.assign(proc, antes); });
     };
   }
 

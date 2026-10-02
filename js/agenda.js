@@ -57,7 +57,7 @@
         sit = { c: s === 'critico' ? 'critico' : s === 'atencao' ? 'atencao' : 'emdia', txt: `Falta${n > 1 ? 'm' : ''} ${n}`, longo: `Falta${n > 1 ? 'm' : ''} ${n} ite${n > 1 ? 'ns' : 'm'} da preparação` };
       }
       return { p, id: p.id, t: p.titulo, quem, ini: p.inicio, fim, h: hr ? hr.h : null, hf: hr ? hr.hf : null, aprox: hr && hr.aprox,
-        local: p.local || (p.modalidade && /online|on-line|ead|remot/i.test(p.modalidade) ? 'On-line' : ''), frentes, sala, sit };
+        local: p.local || (p.modalidade && /online|on-line|ead|remot/i.test(p.modalidade) ? 'On-line' : ''), frentes, sala, sit, conflitos: A.conflitosSala(p) };
     });
   }
 
@@ -127,7 +127,8 @@
           <button class="btn-icone" id="agMais" type="button" aria-label="Aproximar (ver mais detalhes)" title="Aproximar">${svg('<path d="M12 5v14M5 12h14"/>', 18, 'stroke-width="2.2"')}</button>
         </div>
         <label class="ag-marcar"><input type="checkbox" id="agFds"> Sábado e domingo</label>
-        <div class="aquem"><span>Quem:</span><div class="ag-quem-lista" id="agQuem"></div><button class="btn-texto" id="agTodos" type="button">Todos</button></div>
+        <div class="aquem"><span>Quem:</span><div class="ag-quem-lista" id="agQuem"></div><button class="btn-texto" id="agTodos" type="button">Todos</button><button class="btn-texto" id="agMeus" type="button">Só os meus</button></div>
+        <button class="btn" id="agImprimir" type="button">${A.ic('arquivo-ic')} Imprimir a semana</button>
         <span class="ag-dica">Ctrl + rodinha do mouse também aproxima e afasta</span>
       </div>
       <div class="ag-cal" id="agCal"></div>
@@ -206,7 +207,7 @@
       <span class="aev-topo"><span>${e.h}${e.aprox ? '' : '–' + e.hf}${multi}</span><span class="avatar amini" style="${corAv(e.quem)}">${A.esc(e.quem.ini.replace(/\./g, ''))}</span></span>
       <span class="aev-t">${e.novo ? '<span class="novo">novo</span> ' : ''}${A.esc(e.t)}</span>
       ${e.local || e.sala === 'falta' ? `<span class="aev-l">${salaIc} ${A.esc(e.local || 'Local a definir')}${e.sala === 'falta' ? ' · sala a reservar' : ''}</span>` : ''}
-      <span class="aselo ${s.c}">${s.txt}</span>${extra}
+      <span class="aselo ${s.c}">${s.txt}</span>${e.conflitos.length ? '<span class="aselo critico">Conflito de sala</span>' : ''}${extra}
     </button>`;
   }
 
@@ -220,7 +221,7 @@
   function pill(e, d, largo) {
     const s = e.sit, total = A.entre(e.ini, e.fim) + 1;
     return `<button class="ag-pill${st.sel === e.id ? ' sel' : ''}" type="button" data-id="${e.id}" style="${cor(e)}" aria-label="${A.esc(e.t)}${e.h ? ', ' + e.h : ''}${e.local ? ', ' + A.esc(e.local) : ''}, responsável ${A.esc(e.quem.ini)}. ${s.longo}.">
-      <span class="l1"><span class="ag-ponto ${s.c}"></span>${e.h ? `<span>${e.h}</span>` : ''}${e.novo ? '<span class="novo">novo</span>' : ''}<b>${A.esc(e.t)}</b></span>
+      <span class="l1"><span class="ag-ponto ${s.c}"></span>${e.conflitos.length ? `<span class="ag-conf" title="Conflito de sala">${A.ic('alerta', 'ic-sm')}</span>` : ''}${e.h ? `<span>${e.h}</span>` : ''}${e.novo ? '<span class="novo">novo</span>' : ''}<b>${A.esc(e.t)}</b></span>
       ${largo ? `<span class="l2">${A.esc(e.quem.ini)}${e.local ? ' · ' + A.esc(e.local) : ''}${total > 1 ? ` · dia ${A.entre(e.ini, d) + 1} de ${total}` : ''}</span>` : ''}
     </button>`;
   }
@@ -267,7 +268,7 @@
       <span class="aselo grande ${s.c}">${s.longo}</span>
       <dl class="ag-det-dados">
         <div>${svg(IC.hora, 18)}<dt>Quando</dt><dd>${quando}</dd><dd>${A.esc(p.horario || 'Horário não informado')}</dd></div>
-        <div>${svg(IC.local, 18)}<dt>Onde</dt><dd>${A.esc(e.local || 'Local não informado')}${p.modalidade ? ` · ${A.esc(p.modalidade)}` : ''}</dd><dd><span class="ag-sala ${e.sala}">${svg(sala[0], 14)} ${sala[1]}</span></dd></div>
+        <div>${svg(IC.local, 18)}<dt>Onde</dt><dd>${A.esc(e.local || 'Local não informado')}${p.modalidade ? ` · ${A.esc(p.modalidade)}` : ''}</dd><dd><span class="ag-sala ${e.sala}">${svg(sala[0], 14)} ${sala[1]}</span></dd>${e.conflitos.length ? `<dd class="aviso-conflito">${A.ic('alerta')}<span><strong>Conflito de sala.</strong> ${e.conflitos.map(o => A.esc(A.textoConflito(o))).join(' ')}</span></dd>` : ''}</div>
         ${p.unidade || p.apoio ? `<div>${svg(IC.pessoas, 18)}<dt>Unidade e apoio</dt><dd>${A.esc([p.unidade, p.apoio ? 'apoio ' + p.apoio : ''].filter(Boolean).join(' · '))}</dd></div>` : ''}
       </dl>
       <h3>Preparação <span class="secundario">${aplica.length ? `${prontos} de ${aplica.length} prontas` : 'nada a preparar'}</span></h3>
@@ -300,6 +301,57 @@
     if (voltarPara && document.contains(voltarPara)) voltarPara.focus({ preventScroll: true });
   }
 
+  /* ---------- Imprimir a semana: uma folha A4 deitada, com legenda e lista de horários ---------- */
+  function imprimirSemana() {
+    const seg = segunda(st.ancora), hoje = A.hojeIso();
+    let dias = Array.from({ length: 7 }, (_, k) => A.somar(seg, k));
+    const lista = visiveis();
+    const temFds = dias.some(d => fds(d) && lista.some(e => ocorre(e, d)));
+    if (!st.fds && !temFds) dias = dias.filter(d => !fds(d));
+    const daSemana = lista.filter(e => dias.some(d => ocorre(e, d)));
+    const ordem = (a, b) => (a.h || '99') < (b.h || '99') ? -1 : (a.h || '99') > (b.h || '99') ? 1 : a.t.localeCompare(b.t);
+    const pessoas = A.estado.perfis.filter(p => daSemana.some(e => e.p.dono === p.id));
+    const d0 = A.d(dias[0]), d1 = A.d(dias[dias.length - 1]);
+    const titulo = `Semana de ${d0.getDate()}${d0.getMonth() !== d1.getMonth() ? ' de ' + MESL[d0.getMonth()] : ''} a ${d1.getDate()} de ${MESL[d1.getMonth()]} de ${d1.getFullYear()}`;
+    const marcaSala = s => s === 'ok' ? `${svg(IC.check, 12, 'stroke-width="3"')} sala reservada` : s === 'falta' ? `${svg(IC.x, 12, 'stroke-width="3"')} sala a reservar` : '';
+    const quem = !st.quem ? 'Toda a equipe' : [...st.quem].map(id => (A.perfil(id) || {}).ini).filter(Boolean).join(', ');
+    const el = document.createElement('div');
+    el.id = 'impressao';
+    el.innerHTML = `<section class="fi-folha">
+      <header class="fi-cab">
+        <div><p class="fi-rot">Agenda da equipe · Setor pedagógico</p><h1>${titulo}</h1></div>
+        <p class="fi-meta">${daSemana.length} evento${daSemana.length === 1 ? '' : 's'} · ${A.esc(quem)}<br>Impresso em ${A.fmtAno(hoje)}</p>
+      </header>
+      <div class="fi-grade" style="--cols:${dias.length}">
+        ${dias.map(d => { const evd = daSemana.filter(e => ocorre(e, d)).sort(ordem); const dd = A.d(d); return `<section class="fi-dia${d === hoje ? ' hoje' : ''}${fds(d) ? ' fds' : ''}">
+          <h2><span class="fi-dsem">${SEML[dow(d)]}</span><span class="fi-dnum">${String(dd.getDate()).padStart(2, '0')}/${String(dd.getMonth() + 1).padStart(2, '0')}</span></h2>
+          ${evd.length ? evd.map(e => { const tot = A.entre(e.ini, e.fim) + 1; return `<article class="fi-ev" style="--pc:${e.quem.cor};--pbg:${e.quem.bg}">
+            <p class="fi-hora"><span>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : 'Horário a definir'}</span></p>
+            <h3>${A.esc(e.t)}</h3>
+            <p class="fi-onde">${A.esc(e.local || 'Local a definir')}</p>
+            <p class="fi-pe"><span class="fi-ini">${A.esc(e.quem.ini)}</span>${tot > 1 ? `<span>dia ${A.entre(e.ini, d) + 1} de ${tot}</span>` : ''}<span class="fi-sala ${e.sala}">${marcaSala(e.sala)}</span></p>
+            ${e.conflitos.length ? `<p class="fi-conf">Conflito de sala</p>` : ''}
+          </article>`; }).join('') : '<p class="fi-vazio">Sem eventos</p>'}
+        </section>`; }).join('')}
+      </div>
+      <footer class="fi-legenda">
+        <div><p class="fi-rot">Responsáveis</p><ul>${pessoas.map(p => `<li><span class="fi-chip" style="--pc:${p.cor};--pbg:${p.bg}"></span>${A.esc(p.ini)}</li>`).join('') || '<li>—</li>'}</ul></div>
+        <div><p class="fi-rot">Sala</p><ul><li class="fi-sala ok">${svg(IC.check, 12, 'stroke-width="3"')} reservada</li><li class="fi-sala falta">${svg(IC.x, 12, 'stroke-width="3"')} a reservar</li><li>sem marca: não precisa</li></ul></div>
+        <div><p class="fi-rot">Como ler</p><ul><li>O horário vem grifado na cor de quem cuida do evento.</li><li>Eventos de vários dias aparecem em cada dia, com "dia 1 de 3".</li></ul></div>
+      </footer>
+    </section>
+    ${daSemana.length ? `<section class="fi-folha fi-lista">
+      <header class="fi-cab"><div><p class="fi-rot">Lista de horários</p><h1>${titulo}</h1></div></header>
+      <table><thead><tr><th>Dia</th><th>Horário</th><th>Evento</th><th>Local</th><th>Sala</th><th>Responsável</th><th>SEI</th></tr></thead>
+      <tbody>${dias.flatMap(d => daSemana.filter(e => ocorre(e, d)).sort(ordem).map(e => `<tr><td>${curta(d)}</td><td>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : '—'}</td><td>${A.esc(e.t)}</td><td>${A.esc(e.local || '—')}</td><td>${{ ok: 'reservada', falta: 'a reservar', na: '—' }[e.sala]}</td><td>${A.esc(e.quem.ini)}</td><td>${A.esc(e.p.sei || '—')}</td></tr>`)).join('')}</tbody></table>
+    </section>` : ''}`;
+    document.querySelectorAll('#impressao').forEach(x => x.remove());
+    document.body.appendChild(el);
+    const limpar = () => { el.remove(); window.removeEventListener('afterprint', limpar); };
+    window.addEventListener('afterprint', limpar);
+    setTimeout(() => window.print(), 50);
+  }
+
   /* ---------- Navegação e zoom ---------- */
   function irPara(nivel, dia, dir) {
     mudar(() => { st.nivel = nivel; if (dia) st.ancora = dia; desenhar(); guardar(); }, dir || (NIVEIS.indexOf(nivel) < NIVEIS.indexOf(st.nivel) ? 'in' : 'out'));
@@ -329,6 +381,8 @@
     $('#agNiveis').onchange = e => irPara(e.target.value);
     $('#agFds').onchange = e => mudar(() => { st.fds = e.target.checked; desenhar(); guardar(); }, 'in');
     $('#agTodos').onclick = () => { st.quem = null; desenhar(); };
+    $('#agMeus').onclick = () => { st.quem = new Set([A.euId()]); desenhar(); };
+    $('#agImprimir').onclick = imprimirSemana;
     $('#agQuem').onclick = e => {
       const b = e.target.closest('[data-quem]'); if (!b) return;
       const q = b.dataset.quem, todos = A.estado.perfis.map(p => p.id);

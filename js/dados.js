@@ -114,6 +114,34 @@
   /* Na versão publicada para a equipe não existe planilha: o sistema é a fonte */
   /* Regras de quem cria o perfil agora: o padrão da equipe (definido pela administração), ou o do sistema */
   A.regrasNovas = () => A.estado.equipe && A.estado.equipe.regras && A.estado.equipe.regras.tipos ? A.clonar(A.estado.equipe.regras) : A.regrasPadrao();
+  /* ---------- Salas e conflitos ---------- */
+  A.normSala = s => A.semAcento(s).replace(/\s+/g, ' ');
+  const naoSala = s => !s || /on-?line|teams|meet|zoom|remot|a definir/.test(s);
+  A.salas = () => {
+    const fixas = (A.estado.equipe && A.estado.equipe.salas && A.estado.equipe.salas.lista) || [];
+    const usadas = A.estado.processos.map(p => (p.local || '').trim()).filter(Boolean);
+    const vistas = new Map();
+    [...fixas, ...usadas].forEach(s => { const k = A.normSala(s); if (!naoSala(k) && !vistas.has(k)) vistas.set(k, s); });
+    return [...vistas.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  };
+  /* "08:30 às 12:00", "8h - 12h" → minutos de início e fim (null se não der para ler) */
+  A.horasDe = txt => {
+    const t = String(txt || '').toLowerCase().match(/(\d{1,2})\s*(?:[:h]\s*(\d{2}))?/g);
+    if (!t) return null;
+    const m = x => { const r = x.match(/(\d{1,2})\s*(?:[:h]\s*(\d{2}))?/); const h = +r[1], mm = +(r[2] || 0); return h < 24 && mm < 60 ? h * 60 + mm : null; };
+    const a = m(t[0]), b = t[1] ? m(t[1]) : null;
+    return a == null ? null : { ini: a, fim: b != null && b > a ? b : a + 120 };
+  };
+  /* Outros processos no mesmo local, em dias e horários que se cruzam */
+  A.conflitosSala = p => {
+    const local = A.normSala(p.local);
+    if (naoSala(local) || !p.inicio) return [];
+    const fim = p.fim || p.inicio, h = A.horasDe(p.horario);
+    return A.estado.processos.filter(o => o.id !== p.id && !o.arquivado && o.inicio && A.normSala(o.local) === local
+      && o.inicio <= fim && (o.fim || o.inicio) >= p.inicio
+      && (() => { const ho = A.horasDe(o.horario); return !h || !ho || (h.ini < ho.fim && ho.ini < h.fim); })());
+  };
+  A.textoConflito = o => `${o.local} já está marcado para "${o.titulo}" (${(A.perfil(o.dono) || {}).ini || '?'}), ${A.fmt(o.inicio)}${o.fim && o.fim !== o.inicio ? ' a ' + A.fmt(o.fim) : ''}${o.horario ? ', ' + o.horario : ''}.`;
   A.semPlanilha = () => A.modo === 'nuvem' && A.nuvem && A.nuvem.tipo === 'supabase';
   A.dono = () => A.sessao ? A.perfil(A.sessao.perfilId) : null;
   A.prefs = () => {

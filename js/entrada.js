@@ -283,6 +283,11 @@
           <div class="campo" style="margin-top:8px"><label for="pHora">Horário (dias úteis)</label><input id="pHora" type="time" value="${A.esc((p.lembrete && p.lembrete.hora) || '17:00')}" style="max-width:140px"></div>
           <p class="secundario" style="margin-top:8px">O aviso aparece no topo do sistema, se ele estiver aberto, com quantas mudanças estão esperando.</p>
         </fieldset>
+        ${A.semPlanilha() ? `<fieldset><legend>Trocar a minha senha</legend>
+          <p class="secundario" style="margin-bottom:8px">Deixe em branco se não quiser trocar. Pelo menos 8 caracteres.</p>
+          <div class="campo"><label for="pS1">Senha nova</label><input id="pS1" type="password" autocomplete="new-password"></div>
+          <div class="campo" style="margin-top:8px"><label for="pS2">Repita a senha nova</label><input id="pS2" type="password" autocomplete="new-password"></div>
+        </fieldset>` : ''}
         ${A.modo === 'nuvem' ? '' : `<fieldset><legend>Trocar códigos</legend>
           <p class="secundario" style="margin-bottom:8px">Deixe em branco o que não quiser trocar.</p>
           <div class="campo codigo-linha"><label for="pP">Novo código pessoal</label><input id="pP" inputmode="numeric" maxlength="4" type="password" autocomplete="new-password"></div>
@@ -313,10 +318,16 @@
       const hp = pp ? await A.embaralhar(pp) : p.hashPessoal, hc = pc ? await A.embaralhar(pc) : p.hashConsulta;
       if (hp === hc) return falha('Os dois códigos precisam ser diferentes.');
       Object.assign(p, { ini, funcao: f.querySelector('#pFun').value, lembrete: { ativo: f.querySelector('#pLemb').checked, hora: f.querySelector('#pHora').value || '17:00' } });
+      const s1 = f.querySelector('#pS1')?.value || '', s2 = f.querySelector('#pS2')?.value || '';
+      if (s1 || s2) {
+        if (s1.length < 8) return falha('A senha nova precisa ter pelo menos 8 caracteres.');
+        if (s1 !== s2) return falha('As duas senhas novas não são iguais.');
+        try { await A.supa.trocarSenha(s1); } catch (x) { return falha('Não deu para trocar a senha: ' + x.message); }
+      }
       if (A.modo !== 'nuvem') Object.assign(p, { hashPessoal: hp, hashConsulta: hc, consultaEdita: f.querySelector('[name=ed]:checked').value === 'sim' });
       A.salvarJa();
       location.hash = '#/painel';
-      A.avisar('Perfil salvo.');
+      A.avisar((f.querySelector('#pS1') || {}).value ? 'Perfil e senha salvos.' : 'Perfil salvo.');
     };
   };
 })(window.App);

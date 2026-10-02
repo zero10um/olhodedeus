@@ -81,6 +81,16 @@
   S.souAdmin = async () => {
     try { const { data, error } = await cliente().rpc('sou_admin'); return !error && data === true; } catch (e) { return false; }
   };
+  /* Funções do banco (as de administração conferem lá dentro se quem chamou é admin) */
+  S.rpc = async (nome, args) => {
+    const { data, error } = await cliente().rpc(nome, args || {});
+    if (error) throw new Error(/Could not find the function/i.test(error.message) ? 'O banco ainda não tem esta função. Rode o esquema.sql atualizado no Supabase.' : error.message);
+    return data;
+  };
+  S.trocarSenha = async nova => {
+    const { error } = await cliente().auth.updateUser({ password: nova });
+    if (error) throw new Error(/same/i.test(error.message) ? 'A senha nova é igual à atual.' : error.message);
+  };
   S.sairDaConta = async () => {
     try { await cliente().auth.signOut(); } catch (e) {}
     A.sair();

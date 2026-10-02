@@ -11,7 +11,7 @@
     const modoTxt = { dono: 'Seu painel', leitura: 'Só leitura', convidado: 'Editando com permissão' }[A.sessao.acesso];
     const link = (h, n, ativo) => `<a href="#/${h}" ${ativo ? 'aria-current="page"' : ''}>${n}</a>`;
     el.innerHTML = `<a class="marca" href="#/painel">Meus processos</a>
-      ${pagina === 'painel' ? `<div class="busca" role="search">${A.ic('busca')}<label class="sr" for="buscaTopo">Buscar curso ou número SEI</label><input id="buscaTopo" type="search" placeholder="Buscar curso ou SEI" autocomplete="off"></div>` : '<span style="margin-left:auto"></span>'}
+      ${pagina === 'painel' || supa ? `<div class="busca" role="search">${A.ic('busca')}<label class="sr" for="buscaTopo">${supa ? 'Buscar curso ou número SEI na equipe toda' : 'Buscar curso ou número SEI'}</label><input id="buscaTopo" type="search" placeholder="${supa ? 'Buscar SEI ou curso na equipe' : 'Buscar curso ou SEI'}" autocomplete="off" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" hidden></div></div>` : '<span style="margin-left:auto"></span>'}
       ${A.modo === 'nuvem' ? '<span class="status-nuvem" id="statusNuvem" role="status" aria-live="polite"></span>' : ''}
       <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}${supa && A.nuvem.admin ? link('equipe', 'Equipe', pagina === 'equipe') : ''}</nav>
       <div class="perfil"><button type="button" class="perfil-btn" aria-haspopup="menu" aria-expanded="false" id="perfilBtn">${A.avatar(dono)}<span>${A.esc(dono.ini)}</span>${A.ic('seta')}<span class="sr">, ${modoTxt}. Abrir menu do perfil</span></button>
@@ -23,7 +23,22 @@
           ${supa ? `<button type="button" role="menuitem" id="sairConta">${A.ic('cadeado')} Sair da conta (${A.esc(A.supa.usuarioDe(A.supa.usuario.email))})</button>` : ''}
         </div></div>`;
     const bt = document.getElementById('buscaTopo');
-    if (bt) bt.oninput = () => A.buscarNoPainel(bt.value);
+    if (bt) {
+      const res = document.getElementById('buscaRes');
+      bt.oninput = () => { if (pagina === 'painel') A.buscarNoPainel(bt.value); if (supa) buscarEquipe(bt.value, res); };
+      bt.onkeydown = e => {
+        if (e.key === 'ArrowDown' && !res.hidden) { e.preventDefault(); const a = res.querySelector('a'); if (a) a.focus(); }
+        if (e.key === 'Enter' && !res.hidden) { const a = res.querySelector('a'); if (a) { e.preventDefault(); a.click(); } }
+        if (e.key === 'Escape') { res.hidden = true; }
+      };
+      res.onkeydown = e => {
+        const itens = [...res.querySelectorAll('a')], i = itens.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown' && i < itens.length - 1) { e.preventDefault(); itens[i + 1].focus(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? itens[i - 1] : bt).focus(); }
+        if (e.key === 'Escape') { res.hidden = true; bt.focus(); }
+      };
+      document.addEventListener('click', e => { if (!e.target.closest('.busca')) res.hidden = true; });
+    }
     const caixa = el.querySelector('.perfil');
     A.ligarMenu(caixa, caixa.querySelector('#perfilBtn'), caixa.querySelector('.menu-flutuante'), '[role=menuitem]');
     caixa.querySelector('#trocarPessoa').onclick = () => { A.sair(); location.hash = '#/entrar'; };
@@ -35,16 +50,39 @@
     if (A.sessao.acesso === 'convidado') faixas.push(`<div class="faixa-acesso">${A.ic('pessoa')} Você está no painel de <strong>${A.esc(dono.ini)}</strong> e pode editar, ${supa ? 'como administração' : 'porque a pessoa permitiu'}. <a href="#/entrar" id="sairFaixa">Voltar à tela inicial</a></div>`);
     const lemb = lembreteAgora();
     if (lemb) faixas.push(`<div class="faixa-aviso faixa-lembrete">${A.ic('relogio')} São ${A.esc(lemb.hora)}: hora de atualizar a planilha. ${lemb.n ? `${lemb.n} mudança${lemb.n > 1 ? 's' : ''} esperando.` : 'Nada esperando hoje.'} <a href="#/planilha" id="lembIr">Abrir a planilha</a> <button type="button" class="btn-texto" id="lembOk">Hoje não</button></div>`);
+    if (supa && A.nuvem.admin && pagina !== 'equipe' && (!A.prefs().ultimaCopiaEquipe || A.entre(A.prefs().ultimaCopiaEquipe, A.hojeIso()) >= 7))
+      faixas.push(`<div class="faixa-aviso">${A.prefs().ultimaCopiaEquipe ? 'Faz uma semana que você não guarda uma cópia da equipe fora do banco.' : 'Você ainda não guardou nenhuma cópia da equipe fora do banco.'} <a href="#/equipe" id="irCopias">Baixar e guardar no Drive</a></div>`);
     if (A.modo === 'nuvem') { /* online não depende de cópia de segurança */ }
     else if (!A.armazenamentoOk) faixas.push(`<div class="faixa-aviso">Este navegador não está guardando os dados. Antes de fechar, baixe a cópia de segurança em <a href="#/planilha">Planilha</a>.</div>`);
     else if (A.sessao.acesso === 'dono' && A.estado.processos.length && (!A.estado.ultimaCopia || A.entre(A.estado.ultimaCopia, A.hojeIso()) > 7) && pagina !== 'planilha')
       faixas.push(`<div class="faixa-aviso">${A.estado.ultimaCopia ? 'Faz mais de uma semana desde a última cópia de segurança.' : 'Você ainda não baixou uma cópia de segurança.'} <a href="#/planilha">Baixar agora</a></div>`);
     document.getElementById('faixas').innerHTML = faixas.join('');
     const sf = document.getElementById('sairFaixa'); if (sf) sf.onclick = () => A.sair();
+    const ic = document.getElementById('irCopias'); if (ic) ic.addEventListener('click', () => setTimeout(() => { const c = document.getElementById('copias'); if (c) A.rolarAte(c); }, 400));
     const visto = () => { A.prefs().lembreteVisto = A.hojeIso(); A.salvar(); topo(rota()); };
     const li = document.getElementById('lembIr'); if (li) li.addEventListener('click', visto);
     const lo = document.getElementById('lembOk'); if (lo) lo.onclick = visto;
     A.mostrarStatus();
+  }
+
+  /* Busca na equipe toda: pelo número SEI (qualquer pedaço dos dígitos) ou pelo nome */
+  function buscarEquipe(texto, res) {
+    const q = A.semAcento(texto), dig = texto.replace(/\D/g, '');
+    if (q.length < 3) { res.hidden = true; return; }
+    const achados = A.estado.processos.filter(p => (dig.length >= 3 && A.seiChave(p.sei).includes(dig)) || A.semAcento(p.titulo).includes(q)
+      || (p.seis || []).some(s => dig.length >= 3 && String(s.numero || '').replace(/\D/g, '').includes(dig)))
+      .sort((a, b) => (a.arquivado - b.arquivado) || ((A.dataRef(b) || '') > (A.dataRef(a) || '') ? 1 : -1)).slice(0, 8);
+    const marcar = t => { const s = A.esc(t); if (dig.length >= 3) return s; const i = A.semAcento(t).indexOf(q); return i < 0 ? s : A.esc(t.slice(0, i)) + '<mark>' + A.esc(t.slice(i, i + q.length)) + '</mark>' + A.esc(t.slice(i + q.length)); };
+    res.innerHTML = achados.length ? achados.map(p => { const d = A.perfil(p.dono) || { ini: '?' }, rel = dig.length >= 3 && !A.seiChave(p.sei).includes(dig) ? (p.seis || []).find(s => String(s.numero || '').replace(/\D/g, '').includes(dig)) : null;
+      return `<a href="#/processo/${p.id}" data-dono="${p.dono}"><span class="t">${marcar(p.titulo)}</span>
+        <span class="s">${p.sei ? 'SEI ' + A.esc(p.sei) : 'sem SEI'}${rel ? ` · relacionado: ${A.esc(rel.tipo || '')} ${A.esc(rel.numero)}` : ''} · ${p.dono === A.euId() ? 'seu' : 'de ' + A.esc(d.ini)}${p.arquivado ? ' · arquivado' : ''}</span>
+        <span class="q">${A.avatar(d)}</span></a>`; }).join('') : `<p class="vazio secundario">Nada encontrado na equipe.</p>`;
+    res.hidden = false;
+    res.querySelectorAll('a[data-dono]').forEach(a => a.onclick = () => {
+      const dono = a.dataset.dono;
+      if (A.sessao.perfilId !== dono) A.entrarComo(dono, dono === A.euId() ? 'dono' : (A.nuvem.admin ? 'convidado' : 'leitura'));
+      res.hidden = true;
+    });
   }
 
   /* Lembrete de fim de expediente: só no próprio painel, em dias úteis, depois do horário escolhido */
@@ -80,6 +118,8 @@
     }
     if (pagina === 'entrar' && A.sessao && A.dono() && !A.estado.perfis.length) A.sair();
     topo(r);
+    const ls = document.getElementById('lista-salas');
+    if (ls && A.estado) ls.innerHTML = A.salas().map(s => `<option value="${A.esc(s)}">`).join('');
     const v = vista();
     document.title = 'Meus processos';
     if (pagina === 'entrar') A.telaEntrada(v);

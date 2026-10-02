@@ -1,133 +1,78 @@
-MEUS PROCESSOS — guia rápido
-============================
+MEUS PROCESSOS / AGENDA PEDAGÓGICA — guia rápido
+=================================================
 
 O que é
 -------
-Um painel pessoal para acompanhar os processos do setor pedagógico: o que fazer hoje,
-prazos contados a partir do evento, despachos esperando resposta, SEIs relacionados
-e o que falta atualizar na planilha do OneDrive.
-
-Funciona sem internet e sem instalar nada. Os dados ficam só neste computador.
+O sistema do setor pedagógico para acompanhar cada processo SEI do pedido ao
+encerramento: o que falta preparar, em que prazo, o que está esperando resposta,
+os SEIs relacionados e, na Agenda da equipe, os eventos de todo mundo.
 
 
 Duas formas de usar
 -------------------
-A) ONLINE, pela página no Claude (recomendado para usar em vários computadores)
-   - Endereço: https://claude.ai/artifact/B4rjpzEe2uSRCgxm93xRxg
-   - Funciona no site do Claude, pelo navegador, em qualquer computador.
-   - Cada pessoa entra com a própria conta do Claude (não usa código de 4 números).
-   - Os dados ficam no banco compartilhado da página: o que alguém marca aparece
-     para todos, e uma mudança não apaga a de outra pessoa.
-   - Para dar acesso a um colega: na página, use o menu Compartilhar e convide pelo
-     e-mail. Editor = pode mexer. Leitor = só vê.
-   - Em "Planilha", a lista "O que mudar" junta as mudanças de todos os painéis, e um
-     script só leva tudo para a planilha do OneDrive, cada mudança para a aba certa.
+A) PELA INTERNET (a versão da equipe)
+   - Endereço: https://olhodedeus.vercel.app
+   - Cada servidor cria a própria conta (usuário e senha) e o seu perfil com as iniciais.
+   - Todos veem a Agenda da equipe; cada um só altera os próprios processos.
+   - Os dados ficam no banco da equipe (Supabase, em São Paulo).
 
-B) SEM INTERNET, pelo arquivo desta pasta (index.html)
-   - Os dados ficam só no navegador daquele computador, com códigos de 4 números.
-   - Os dados das duas formas são separados.
-
-
-Como abrir pelo arquivo
------------------------
-1. Dê dois cliques no arquivo "index.html" desta pasta.
-2. Ele abre no navegador (Edge ou Chrome). Use sempre o MESMO navegador:
-   os dados ficam guardados nele.
-3. Dica: salve a página nos favoritos para abrir mais rápido.
-
-
-Primeiro uso
-------------
-1. Crie o seu perfil: iniciais, função e dois códigos de 4 números.
-   - Código pessoal: só seu. Entra e pode mexer em tudo.
-   - Código de consulta: para passar a quem você quiser. Só vê
-     (ou também edita, se você permitir em "Meu perfil e códigos").
-2. Leia a planilha:
-   - No OneDrive, abra a planilha de controle e vá em
-     Arquivo > Salvar como > Baixar uma cópia.
-   - No sistema, vá em "Planilha", escolha o arquivo baixado e a sua aba.
-   - Confira o que vai mudar e confirme.
+B) SEM INTERNET (esta pasta)
+   - Dê dois cliques em "index.html". Abre no navegador (Edge ou Chrome).
+   - Os dados ficam só naquele navegador, naquele computador, protegidos por um
+     código de 4 números. Use sempre o MESMO navegador.
+   - As duas versões não se misturam. Para levar seus processos desta pasta para a
+     internet: aqui, baixe a cópia de segurança; lá, em Relatório, use
+     "Trazer uma cópia para o meu painel".
 
 
 No dia a dia
 ------------
-- Painel: o resumo do dia, a agenda (linha do tempo, mês ou semanas corridas)
-  e o que fazer (cartões, quadro ou foco do dia). Tudo muda em "Ver como".
-- Marque o que fez. Quando despachar algo, use "Despachei": a tarefa vai para
-  "Esperando resposta" até você marcar "Chegou resposta".
-- Clique no nome de um processo para ver tudo dele: fases, frentes, cronograma,
-  ficha em tabela, SEIs relacionados e diário. Tudo é editável.
-- "O que mudar na planilha" (tela Planilha) mostra exatamente o que passar para o
-  OneDrive. Depois de atualizar lá, clique em "Já atualizei".
-- Leia a planilha de novo sempre que quiser trazer o que os colegas mudaram.
+- Painel: o que fazer hoje, o que está atrasado e o que espera resposta.
+- Processos: cadastre cada processo. Cole o número SEI inteiro: o sistema guarda só
+  os últimos 11 dígitos. Ele avisa se o SEI já foi cadastrado por alguém.
+- Local: escolha a sala da lista. Se a sala já estiver marcada no mesmo dia e
+  horário, o sistema avisa ("Conflito de sala").
+- Agenda da equipe: aproxime e afaste (Dia, Semana, 2 semanas, Mês; ou Ctrl + rodinha).
+  Clique num evento para ver horário, local, se a sala está pronta e o que falta.
+  "Só os meus" mostra só os seus; "Todos" volta para a equipe.
+  "Imprimir a semana" gera a folha da semana com legenda e a lista de horários.
+- Busca (no alto): procure um SEI ou um curso na equipe toda.
+- Relatório: baixa a planilha arrumada (abas Processos e Pendências).
 
 
-Levar o que você marcou para a planilha do OneDrive (script do Excel)
--------------------------------------------------------------------
-1. Na tela "Planilha", em "O que mudar na planilha", clique em "Gerar script do Excel"
-   e depois em "Copiar o script".
-2. Abra a planilha de controle no OneDrive, pelo navegador.
-3. Se a sua aba estiver protegida: Revisão > Desproteger planilha.
-4. Automatizar > Novo script. Apague o que estiver escrito, cole e clique em Executar.
-5. No fim aparece o que mudou e os avisos (por exemplo, processo que não está na planilha).
-6. Proteja a aba de novo e, no sistema, clique em "Já rodei o script".
-O script só mexe nas colunas de acompanhamento (Feito, Pendente, Não se aplica) e acha
-cada processo pelos últimos 11 dígitos do número SEI. Ele roda direto na planilha
-compartilhada, sem baixar nem subir arquivo, então não apaga o que os colegas mudaram.
+Os grifos
+---------
+- Vermelho = crítico, amarelo = atenção, azul = em dia, verde = pronto.
+- Rosa = onde você está, ou algo novo que um colega cadastrou.
+- Carimbo = feito, tudo feito ou arquivado.
 
 
-Modo LGPD e cópia limpa
------------------------
-- Com "Guardar só o necessário" ligado (vem ligado), ao ler a planilha o sistema guarda
-  o SEI só com os últimos 11 dígitos, pessoas só pelas iniciais (inclusive nomes da
-  equipe que aparecem no título do curso) e não traz as observações.
-- "Baixar cópia limpa (.xlsx)" gera uma versão da planilha só com o necessário, para
-  levar a outro lugar. Confira o título dos cursos: nomes de pessoas de fora da equipe
-  (palestrantes, por exemplo) não são reconhecidos sozinhos.
-
-
-Regras de prazo
+Esqueci a senha
 ---------------
-Na tela "Regras de prazo" ficam os passos de cada tipo de processo e quantos dias
-antes ou depois da data cada um vence. Os valores que vieram são um ponto de partida,
-para ajustar aos poucos. Depois de mudar, use "Atualizar processos" para levar as
-regras novas para os processos em andamento (o que você mudou à mão é mantido).
+Peça para a administração: na tela Equipe, "Redefinir senha". Depois de entrar,
+troque em Meu perfil.
 
 
-Levar os dados de uma versão para a outra
------------------------------------------
-- Do arquivo para a online: no arquivo, Planilha > "Baixar cópia de segurança".
-  Na página do Claude, Planilha > "Trazer uma cópia para cá". Os processos entram no
-  seu painel online; os que já existem lá (mesmo SEI) são atualizados.
-- Da online para o arquivo: na página do Claude, Planilha > "Baixar cópia de segurança".
-  No arquivo, Planilha > "Restaurar uma cópia" (troca os dados deste navegador pelos da
-  cópia). Na primeira entrada, o sistema pede para criar o código de 4 números.
+Administração (só quem é admin vê a tela Equipe)
+------------------------------------------------
+- Abrir e editar o painel de qualquer servidor; passar processos de um para outro.
+- Redefinir senha; tornar outra pessoa admin (ou tirar).
+- Cadastrar as salas e auditórios.
+- Definir as regras de prazo da equipe (o padrão de quem cria perfil).
+- Cópias de segurança: o banco guarda uma cópia sozinho todo dia às 6h (as 30 últimas).
+  Uma vez por semana, baixe a mais nova em Equipe e guarde no Drive.
 
 
-Cópia de segurança (importante)
--------------------------------
-Os dados ficam no navegador. Se o histórico do navegador for apagado, eles somem.
-Por isso:
-- Na tela "Planilha", clique em "Baixar cópia de segurança" toda semana.
-  O sistema avisa quando passar de 7 dias.
-- Guarde o arquivo .json numa pasta segura (por exemplo, no seu OneDrive).
-- Para levar tudo para outro computador: copie esta pasta inteira para lá, abra o
-  index.html e use "Restaurar uma cópia" com o último arquivo .json.
-
-
-Privacidade
------------
-- Nada é enviado para a internet. A planilha é lida aqui mesmo, no navegador.
-- Pessoas aparecem só pelas iniciais.
-- Os códigos ficam guardados embaralhados. Eles evitam que alguém mexa sem querer,
-  mas não são uma segurança forte: quem tiver acesso a este computador e souber
-  mexer com arquivos consegue ver os dados.
+Privacidade (LGPD)
+------------------
+- Só iniciais das pessoas; nada de nome completo, CPF ou e-mail.
+- Número SEI guardado pelos últimos 11 dígitos.
+- Não escreva nomes completos nos títulos nem nas anotações.
 
 
 Conteúdo da pasta
 -----------------
-index.html     a página do sistema (abra esta)
-css/           aparência
-js/            funcionamento
-lib/           peça que lê arquivos do Excel (SheetJS, licença Apache 2.0)
-fontes/        letra Atkinson Hyperlegible Next (licença SIL OFL, em fontes/OFL.txt)
+index.html ............ o sistema
+css/, js/, lib/ ........ o funcionamento (não mexa)
+fontes/ ............... a fonte Archivo (licença livre, OFL)
+Abrir a versão da equipe.url ... atalho para o endereço da internet

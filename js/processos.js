@@ -65,7 +65,7 @@
         <div class="campo" data-so="limite"><label for="nLimite">Data limite</label><input id="nLimite" type="date"></div>
         <div class="campo" data-so="evento"><label for="nHorario">Horário</label><input id="nHorario" placeholder="08:00 às 12:00"></div>
         <div class="campo" data-so="evento"><label for="nModal">Modalidade</label><select id="nModal"><option value="">—</option><option>Presencial</option><option>Online</option><option>Híbrido</option></select></div>
-        <div class="campo largo" data-so="evento"><label for="nLocal">Local</label><input id="nLocal"></div>
+        <div class="campo largo" data-so="evento"><label for="nLocal">Local</label><input id="nLocal" list="lista-salas" autocomplete="off"></div>
         <div class="campo largo"><label for="nApoio">Apoio <small>(nome; aparece só com as iniciais)</small></label><input id="nApoio"></div>
       </div>
       <div class="form-botoes"><a class="btn btn-grande" href="#/processos">Cancelar</a><button class="btn btn-primario btn-grande" type="submit">Criar processo</button></div>
@@ -81,6 +81,7 @@
     });
     f.querySelector('#nTitulo').focus();
     f.querySelectorAll('input').forEach(i => i.addEventListener('input', () => { i.removeAttribute('aria-invalid'); const m = i.parentElement.querySelector('.erro'); if (m) m.hidden = true; }));
+    let conflitoAceito = '';
     f.onsubmit = e => {
       e.preventDefault();
       const v = id => f.querySelector('#' + id).value.trim();
@@ -92,6 +93,20 @@
       const tipo = regras.tipos.find(x => x.id === v('nTipo')), ev = tipo.ref === 'evento';
       if (ev && v('nFim') && !v('nInicio')) return erro('nInicio', 'Escolha também a data de início.');
       if (ev && v('nFim') && v('nFim') < v('nInicio')) return erro('nFim', 'O fim não pode ser antes do início.');
+      // sala já ocupada no mesmo dia e horário: avisa e pede um segundo clique
+      if (ev && v('nLocal') && v('nInicio')) {
+        const conf = A.conflitosSala({ id: null, local: v('nLocal'), inicio: v('nInicio'), fim: v('nFim') || v('nInicio'), horario: v('nHorario') });
+        const chave = conf.map(o => o.id).join(',');
+        let caixa = f.querySelector('#nConflito');
+        if (conf.length && conflitoAceito !== chave) {
+          if (!caixa) { caixa = document.createElement('div'); caixa.id = 'nConflito'; caixa.className = 'aviso-conflito'; caixa.setAttribute('role', 'alert'); f.querySelector('.form-botoes').before(caixa); }
+          caixa.innerHTML = `${A.ic('alerta')}<div><strong>Conflito de sala.</strong> ${conf.map(o => A.esc(A.textoConflito(o))).join(' ')}<br>Troque o local ou o horário, ou clique de novo para salvar assim mesmo.</div>`;
+          conflitoAceito = chave;
+          f.querySelector('[type=submit]').textContent = 'Salvar assim mesmo';
+          return;
+        }
+        if (!conf.length && caixa) caixa.remove();
+      }
       const p = A.novoProcesso({ titulo: v('nTitulo'), tipoId: tipo.id, sei, unidade: v('nUnidade'), entrada: v('nEntrada') || A.hojeIso(),
         inicio: ev ? v('nInicio') : '', fim: ev ? (v('nFim') || v('nInicio')) : '', limite: ev ? '' : v('nLimite'), horario: ev ? v('nHorario') : '',
         modalidade: ev ? v('nModal') : '', local: ev ? v('nLocal') : '', apoio: v('nApoio') }, A.sessao.perfilId);
