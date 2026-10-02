@@ -263,6 +263,8 @@
     const lim = A.regras(proc.dono).limites;
     const pend = A.itensAtivos(proc).filter(x => x.i.estado !== 'feita');
     if (!pend.length) return 'ok';
+    // evento externo: a escola só encaminha; não acende vermelho nem amarelo
+    if (proc.ambito === 'externo') return A.dataRef(proc) ? 'emdia' : 'semdata';
     const ref = A.dataRef(proc);
     if (!ref) return 'semdata';
     const ev = A.dias(ref);
@@ -317,7 +319,9 @@
     };
     if (ext) EXTRAS_EXTERNO.forEach(([fr, chave, nome, dias, quando, ref]) => {
       const f = p.frentes.find(x => x.modeloId === fr);
-      if (f && !f.itens.some(i => i.extra === chave)) f.itens.push({ id: 'i' + A.uid(), modeloId: null, extra: chave, so: 'externo', nome, regra: { dias, quando, ref }, estado: 'aberta', coluna: null, na: false, editado: false });
+      const parecido = { 'ext-inscricao': /inscri/, 'ext-avisar': /avisar.*certificad/, 'ext-cobrar': /cobrar.*certificad/ }[chave];
+      const jaTem = p.frentes.some(x => x.itens.some(i => parecido.test(A.semAcento(i.nome))));
+      if (f && !jaTem && !f.itens.some(i => i.extra === chave)) f.itens.push({ id: 'i' + A.uid(), modeloId: null, extra: chave, so: 'externo', nome, regra: { dias, quando, ref }, estado: 'aberta', coluna: null, na: false, editado: false });
     });
     p.frentes.forEach(f => {
       if (soNoInterno(f)) marcar(f, ext);
@@ -346,6 +350,14 @@
     if (pos < 0) return () => {};
     l.splice(pos, 1); A.salvar();
     return () => { if (!l.includes(p)) l.splice(Math.min(pos, l.length), 0, p); A.salvar(); };
+  };
+  /* Passo a passo (guiado) ou simples (checklist e quadro) */
+  A.ESTILOS = { guiado: ['Passo a passo', 'Uma fase por vez, com o início guiado e sugestões.'], simples: ['Simples', 'Número, nome, data e um checklist. Painel mais limpo, em quadro.'] };
+  A.definirEstilo = v => {
+    const pr = A.prefs(); pr.estilo = v;
+    pr.modoProc = v === 'simples' ? 'lista' : 'frentes';
+    if (pr.painel) pr.painel.modoFazer = v === 'simples' ? 'quadro' : 'cartoes';
+    A.salvar();
   };
   A.tudoFeito = p => { const it = A.itensAtivos(p); return it.length > 0 && it.every(x => x.i.estado === 'feita'); };
 

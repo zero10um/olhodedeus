@@ -61,10 +61,19 @@
     const el = vista.querySelector('#formNovo');
     el.innerHTML = `<form class="cartao-form" id="fNovo" novalidate aria-labelledby="t-novo">
       <h2 id="t-novo">Novo processo</h2>
-      <p class="secundario" style="margin-bottom:16px">Os passos vêm das Regras de prazo do tipo escolhido. Dá para mudar tudo depois.</p>
+      <p class="secundario" style="margin-bottom:16px">Só o essencial agora. Os passos vêm das Regras de prazo do tipo escolhido, e dá para mudar tudo depois.</p>
+      <fieldset class="classifica" id="nQue">
+        <legend>O que é este processo?</legend>
+        <div class="tipo-cartoes">
+          ${[['capacitacao', 'A EMPRO promove, com docente ou empresa contratada'], ['acao-equipe', 'A própria equipe da EMPRO executa'], ['evento-externo', 'O servidor vai a um evento de fora'], ['certificacao', 'Só emitir certificado, sem evento para organizar']]
+            .filter(([id]) => regras.tipos.some(t => t.id === id)).map(([id, d], k) => `<label class="opcao-ficha"><input type="radio" name="nTipoC" value="${id}" ${k === 0 ? 'checked' : ''}><span><strong>${A.esc(id === 'certificacao' ? 'Só emissão de certificado' : regras.tipos.find(t => t.id === id).nome)}</strong><small>${d}</small></span></label>`).join('')}
+        </div>
+        <label class="tipo-outro">Outro tipo: <select id="nTipoOutro"><option value="">—</option>${regras.tipos.filter(t => !['capacitacao', 'acao-equipe', 'evento-externo', 'certificacao'].includes(t.id)).map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></label>
+        <input type="hidden" id="nTipo" value="">
+      </fieldset>
       <fieldset class="classifica" id="nClasse">
-        <legend>Antes de tudo: classificação</legend>
-        <div class="classifica-grupo" role="radiogroup" aria-labelledby="rAmb">
+        <legend>Classificação</legend>
+        <div class="classifica-grupo" role="radiogroup" aria-labelledby="rAmb" id="nAmbGrupo">
           <p class="classifica-rot" id="rAmb">Onde acontece</p>
           ${Object.entries(A.AMBITOS).map(([k, [n, d]]) => `<label class="opcao-ficha"><input type="radio" name="nAmbito" value="${k}"><span><strong>${n}</strong><small>${d}</small></span></label>`).join('')}
         </div>
@@ -77,23 +86,41 @@
       </fieldset>
       <div class="grade-campos">
         <div class="campo largo"><label for="nTitulo">Nome do curso ou evento</label><input id="nTitulo"><div class="erro" hidden></div></div>
-        <div class="campo"><label for="nTipo">Tipo</label><select id="nTipo">${regras.tipos.map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></div>
         <div class="campo"><label for="nSei">Número do processo SEI</label><input id="nSei" placeholder="19.25.000000000.0000000/2026-00" aria-describedby="nSeiVai"><div class="erro" hidden></div><p class="secundario" id="nSeiVai" style="font-size:var(--t-xs);margin-top:4px">Cole o número inteiro. ${A.lgpd() ? 'O sistema guarda só os últimos 11 dígitos.' : ''}</p></div>
-        <div class="campo largo"><label for="nUnidade">Quem pediu (unidade)</label><input id="nUnidade"></div>
-        <div class="campo"><label for="nEntrada">Chegou ao setor em</label><input id="nEntrada" type="date" value="${A.hojeIso()}"></div>
-        <div class="campo" data-so="evento"><label for="nInicio">Início do evento</label><input id="nInicio" type="date"><div class="erro" hidden></div></div>
-        <div class="campo" data-so="evento"><label for="nFim">Fim do evento</label><input id="nFim" type="date"><div class="erro" hidden></div></div>
-        <div class="campo" data-so="limite"><label for="nLimite">Data limite</label><input id="nLimite" type="date"></div>
-        <div class="campo" data-so="evento"><label for="nHorario">Horário</label><input id="nHorario" placeholder="08:00 às 12:00"></div>
-        <div class="campo" data-so="evento"><label for="nModal">Modalidade</label><select id="nModal"><option value="">—</option><option>Presencial</option><option>Online</option><option>Híbrido</option></select></div>
-        <div class="campo largo" data-so="evento"><label for="nLocal">Local</label><input id="nLocal" list="lista-salas" autocomplete="off"></div>
-        <div class="campo largo"><label for="nApoio">Apoio <small>(nome; aparece só com as iniciais)</small></label><input id="nApoio"></div>
+        <div class="campo" data-so="evento"><label for="nInicio">Início do evento <small>(se já souber)</small></label><input id="nInicio" type="date"><div class="erro" hidden></div></div>
+        <div class="campo" data-so="limite"><label for="nLimite">Data limite <small>(se houver)</small></label><input id="nLimite" type="date"></div>
       </div>
+      <details class="mais-detalhes"><summary>Mais detalhes <small>(opcional: dá para preencher depois)</small></summary>
+        <div class="grade-campos">
+          <div class="campo largo"><label for="nUnidade">Quem pediu (unidade)</label><input id="nUnidade"></div>
+          <div class="campo"><label for="nEntrada">Chegou ao setor em</label><input id="nEntrada" type="date" value="${A.hojeIso()}"></div>
+          <div class="campo" data-so="evento"><label for="nFim">Fim do evento</label><input id="nFim" type="date"><div class="erro" hidden></div></div>
+          <div class="campo" data-so="evento"><label for="nHorario">Horário</label><input id="nHorario" placeholder="08:00 às 12:00"></div>
+          <div class="campo" data-so="evento"><label for="nModal">Modalidade</label><select id="nModal"><option value="">—</option><option>Presencial</option><option>Online</option><option>Híbrido</option></select></div>
+          <div class="campo largo" data-so="evento"><label for="nLocal">Local</label><input id="nLocal" list="lista-salas" autocomplete="off"></div>
+          <div class="campo largo"><label for="nApoio">Apoio <small>(nome; aparece só com as iniciais)</small></label><input id="nApoio"></div>
+        </div>
+      </details>
       <div class="form-botoes"><a class="btn btn-grande" href="#/processos">Cancelar</a><button class="btn btn-primario btn-grande" type="submit">Criar processo</button></div>
     </form>`;
     const f = el.querySelector('#fNovo');
-    const mostrar = () => { const t = regras.tipos.find(x => x.id === f.querySelector('#nTipo').value); f.querySelectorAll('[data-so]').forEach(c => c.hidden = c.dataset.so !== (t.ref === 'evento' ? 'evento' : 'limite')); };
-    f.querySelector('#nTipo').onchange = mostrar; mostrar();
+    // o tipo escolhido decide o que aparece: externo e capacitação já sabem se são internos ou externos
+    const AMB_DO_TIPO = { 'evento-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' };
+    const mostrar = () => {
+      const outro = f.querySelector('#nTipoOutro').value, card = f.querySelector('[name=nTipoC]:checked');
+      const id = outro || (card ? card.value : regras.tipos[0].id), t = regras.tipos.find(x => x.id === id) || regras.tipos[0];
+      f.querySelector('#nTipo').value = t.id;
+      f.querySelectorAll('[data-so]').forEach(c => c.hidden = c.dataset.so !== (t.ref === 'evento' ? 'evento' : 'limite'));
+      const amb = AMB_DO_TIPO[t.id], grupo = f.querySelector('#nAmbGrupo'), soEvento = t.ref === 'evento';
+      grupo.hidden = !!amb || !soEvento;
+      f.querySelector('#nClasseDica').hidden = !!amb || !soEvento;
+      if (amb) { const r = f.querySelector(`[name=nAmbito][value=${amb}]`); if (r) r.checked = true; }
+      else if (!soEvento) f.querySelectorAll('[name=nAmbito]').forEach(r => { r.checked = false; });
+      f.querySelector('#nTitulo').previousElementSibling.textContent = t.id === 'certificacao' ? 'Nome do curso dos certificados' : soEvento ? 'Nome do curso ou evento' : 'Nome do processo';
+    };
+    f.querySelectorAll('[name=nTipoC]').forEach(r => r.onchange = () => { f.querySelector('#nTipoOutro').value = ''; mostrar(); });
+    f.querySelector('#nTipoOutro').onchange = () => { if (f.querySelector('#nTipoOutro').value) f.querySelectorAll('[name=nTipoC]').forEach(r => { r.checked = false; }); mostrar(); };
+    mostrar();
     f.querySelectorAll('[name=nAmbito], [name=nPublico]').forEach(r => r.onchange = () => { f.querySelector('#nClasseErro').hidden = true; });
     const vai = f.querySelector('#nSeiVai');
     f.querySelector('#nSei').addEventListener('input', e => {
@@ -110,8 +137,10 @@
       const erro = (id, t) => { const c = f.querySelector('#' + id), m = c.parentElement.querySelector('.erro'); c.setAttribute('aria-invalid', 'true'); m.textContent = t; m.hidden = false; c.focus(); };
       const amb = (f.querySelector('[name=nAmbito]:checked') || {}).value, pub = (f.querySelector('[name=nPublico]:checked') || {}).value;
       const ec = f.querySelector('#nClasseErro');
-      if (!amb || !pub) { ec.textContent = !amb ? 'Escolha se o processo é interno ou externo.' : 'Escolha para quem é: membros, membros e servidores, ou servidores.'; ec.hidden = false; f.querySelector('#nClasse').scrollIntoView({ block: 'center' }); (f.querySelector(!amb ? '[name=nAmbito]' : '[name=nPublico]')).focus(); return; }
+      const precisaAmb = !f.querySelector('#nAmbGrupo').hidden;
+      if ((precisaAmb && !amb) || !pub) { ec.textContent = precisaAmb && !amb ? 'Escolha se o processo é interno ou externo.' : 'Escolha para quem é: membros, membros e servidores, ou servidores.'; ec.hidden = false; f.querySelector('#nClasse').scrollIntoView({ block: 'center' }); (f.querySelector(!amb ? '[name=nAmbito]' : '[name=nPublico]')).focus(); return; }
       ec.hidden = true;
+      const ambFinal = f.querySelector('#nAmbGrupo').hidden ? (({ 'evento-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' })[v('nTipo')] || '') : amb;
       if (!v('nTitulo')) return erro('nTitulo', 'Escreva o nome do curso ou evento.');
       const sei = A.seiNormal(v('nSei'));
       const igual = sei && A.seiChave(sei).length >= 11 && (A.semPlanilha() ? A.estado.processos : A.meus()).find(p => A.seiChave(p.sei) === A.seiChave(sei));
@@ -135,7 +164,7 @@
       }
       const p = A.novoProcesso({ titulo: v('nTitulo'), tipoId: tipo.id, sei, unidade: v('nUnidade'), entrada: v('nEntrada') || A.hojeIso(),
         inicio: ev ? v('nInicio') : '', fim: ev ? (v('nFim') || v('nInicio')) : '', limite: ev ? '' : v('nLimite'), horario: ev ? v('nHorario') : '',
-        modalidade: ev ? v('nModal') : '', local: ev ? v('nLocal') : '', apoio: v('nApoio'), ambito: amb, publico: pub }, A.sessao.perfilId);
+        modalidade: ev ? v('nModal') : '', local: ev ? v('nLocal') : '', apoio: v('nApoio'), ambito: ambFinal, publico: pub }, A.sessao.perfilId);
       p.naPlanilha = {};
       A.estado.processos.push(p);
       A.salvarJa();

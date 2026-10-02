@@ -3,6 +3,7 @@
   const MODOS = [
     { v: 'frentes', t: 'Fases e frentes', d: 'Cada frente num cartão, com os passos dentro.', ic: 'cartoes' },
     { v: 'cronograma', t: 'Cronograma', d: 'O processo inteiro numa linha do tempo. Arraste um passo para mudar o prazo.', ic: 'v-crono' },
+    { v: 'lista', t: 'Lista simples', d: 'Só o checklist, em ordem de prazo. Sem fases nem cartões.', ic: 'lista' },
     { v: 'ficha', t: 'Ficha em tabela', d: 'Tudo numa tabela, como a planilha. Edite direto: salva sozinho.', ic: 'v-tabela' },
   ];
   const ESTADOS = [['aberta', 'A fazer'], ['esperando', 'Esperando resposta'], ['feita', 'Feito']];
@@ -326,6 +327,23 @@
         </div><div id="novo-${f.id}"></div>
       </div></div></div></article>`;
   }
+  /* ---------- Modo lista simples: um checklist só, em ordem de prazo ---------- */
+  function desenharLista(el) {
+    const verFeitos = !!A.prefs().listaFeitos;
+    const todos = proc.frentes.filter(f => !f.na).flatMap(f => f.itens.filter(i => !i.na).map(i => ({ f, i, p: prazo(i) || '9999' })));
+    const abertos = todos.filter(x => x.i.estado !== 'feita').sort((a, b) => a.p < b.p ? -1 : 1);
+    const feitos = todos.filter(x => x.i.estado === 'feita');
+    const alvo = proc.frentes.find(f => !f.na && f.fase === 'prep') || proc.frentes.find(f => !f.na) || proc.frentes[0];
+    el.innerHTML = `<section class="lista-simples-proc" aria-labelledby="t-check">
+      <div class="lista-topo"><h2 id="t-check">Checklist</h2><span class="secundario">${feitos.length} de ${todos.length} feitos</span>
+        <label class="chave"><input type="checkbox" id="verFeitos" ${verFeitos ? 'checked' : ''}> Mostrar os feitos</label></div>
+      <ul class="tarefas">${abertos.map(x => linhaTarefa(x.f, x.i)).join('') || '<li class="vazio">Tudo feito.</li>'}${verFeitos ? feitos.map(x => linhaTarefa(x.f, x.i)).join('') : ''}</ul>
+      ${pode() && alvo ? `<button type="button" class="btn-texto" data-novo="${alvo.id}">${A.ic('mais', 'ic-sm')}Acrescentar item</button><div id="novo-${alvo.id}"></div>` : ''}
+    </section>`;
+    ligarFases(el);
+    el.querySelector('#verFeitos').onchange = e => { A.prefs().listaFeitos = e.target.checked; A.salvar(); desenharConteudo(); };
+  }
+
   /* ---------- "Agora": o que está com você e o que espera outras unidades, nesta fase ---------- */
   function agoraHTML(fa) {
     const frs = proc.frentes.filter(f => f.fase === fa.id && !f.na);
@@ -804,7 +822,7 @@
   function desenharConteudo() {
     const el = vistaEl.querySelector('#fases');
     vistaEl.querySelector('#corpo').classList.toggle('largo', modo() !== 'frentes');
-    if (modo() === 'cronograma') desenharCronograma(el); else if (modo() === 'ficha') desenharFicha(el); else desenharFases(el);
+    if (modo() === 'cronograma') desenharCronograma(el); else if (modo() === 'ficha') desenharFicha(el); else if (modo() === 'lista') desenharLista(el); else desenharFases(el);
   }
   function desenhar() {
     if (!vistaEl || !vistaEl.isConnected || !A.estado.processos.includes(proc)) return;

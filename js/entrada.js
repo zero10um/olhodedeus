@@ -278,6 +278,9 @@
           <div class="campo" style="margin-top:12px" ${A.semPlanilha() ? 'hidden' : ''}><label for="pFun">Função</label><select id="pFun">${FUNCOES.map(f => `<option ${p.funcao === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
           <p class="secundario" style="margin-top:12px">Em breve: escolher um desenho ou colocar uma foto pequena no lugar das iniciais.</p>
         </fieldset>
+        <fieldset><legend>Meu jeito de usar</legend>
+          ${Object.entries(A.ESTILOS).map(([k, [n, d]]) => `<label class="opcao"><input type="radio" name="estilo" value="${k}" ${(A.prefs().estilo || 'guiado') === k ? 'checked' : ''}> <span><strong>${n}</strong> <small>${d}</small></span></label>`).join('')}
+        </fieldset>
         <fieldset ${A.semPlanilha() ? 'hidden' : ''}><legend>Lembrete de fim de expediente</legend>
           <label class="opcao"><input type="checkbox" id="pLemb" ${p.lembrete && p.lembrete.ativo ? 'checked' : ''}> Avisar para atualizar a planilha</label>
           <div class="campo" style="margin-top:8px"><label for="pHora">Horário (dias úteis)</label><input id="pHora" type="time" value="${A.esc((p.lembrete && p.lembrete.hora) || '17:00')}" style="max-width:140px"></div>
@@ -318,6 +321,8 @@
       const hp = pp ? await A.embaralhar(pp) : p.hashPessoal, hc = pc ? await A.embaralhar(pc) : p.hashConsulta;
       if (hp === hc) return falha('Os dois códigos precisam ser diferentes.');
       Object.assign(p, { ini, funcao: f.querySelector('#pFun').value, lembrete: { ativo: f.querySelector('#pLemb').checked, hora: f.querySelector('#pHora').value || '17:00' } });
+      const est = (f.querySelector('[name=estilo]:checked') || {}).value;
+      if (est && est !== A.prefs().estilo) A.definirEstilo(est);
       const s1 = f.querySelector('#pS1')?.value || '', s2 = f.querySelector('#pS2')?.value || '';
       if (s1 || s2) {
         if (s1.length < 8) return falha('A senha nova precisa ter pelo menos 8 caracteres.');

@@ -1290,3 +1290,17 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .rg-quem { display: flex; flex-direction: column; gap: 2px; }
 .rg-quem .chave { font-size: var(--t-xs); min-height: 0; }
 @media (max-width: 760px) { .rg-l { grid-template-columns: 1fr; gap: 4px; } .rg-tags { justify-content: flex-start; } }
+
+/* Novo processo: tipo primeiro, detalhes recolhidos */
+.tipo-cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--e-2); }
+.tipo-outro { font-size: var(--t-sm); color: var(--tinta-2); display: inline-flex; gap: 8px; align-items: center; }
+.tipo-outro select { border: 1px solid var(--borda-campo); background: var(--folha); padding: 4px 8px; font: inherit; font-size: var(--t-sm); }
+.mais-detalhes { margin-top: var(--e-4); }
+.mais-detalhes > summary { cursor: pointer; font-weight: 700; color: var(--caneta); padding: 6px 0; }
+.mais-detalhes > summary small { color: var(--tinta-2); font-weight: 400; }
+.mais-detalhes[open] > summary { margin-bottom: var(--e-3); }
+/* Lista simples */
+.lista-simples-proc { background: var(--folha); border: 1px solid var(--tinta); padding: var(--e-4) var(--e-5); }
+.lista-topo { display: flex; align-items: baseline; gap: var(--e-3); flex-wrap: wrap; margin-bottom: var(--e-3); border-bottom: 1px solid var(--linha); padding-bottom: var(--e-2); }
+.lista-topo .chave { margin-left: auto; }
+.faixa-estilo { display: flex; gap: var(--e-3); align-items: center; justify-content: center; flex-wrap: wrap; padding: 10px var(--e-4); font-size: var(--t-sm); background: var(--folha); border-bottom: 1px solid var(--tinta); }

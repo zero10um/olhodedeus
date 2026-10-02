@@ -54,12 +54,15 @@
     if (lemb) faixas.push(`<div class="faixa-aviso faixa-lembrete">${A.ic('relogio')} São ${A.esc(lemb.hora)}: hora de atualizar a planilha. ${lemb.n ? `${lemb.n} mudança${lemb.n > 1 ? 's' : ''} esperando.` : 'Nada esperando hoje.'} <a href="#/planilha" id="lembIr">Abrir a planilha</a> <button type="button" class="btn-texto" id="lembOk">Hoje não</button></div>`);
     if (supa && A.nuvem.admin && pagina !== 'equipe' && (!A.prefs().ultimaCopiaEquipe || A.entre(A.prefs().ultimaCopiaEquipe, A.hojeIso()) >= 7))
       faixas.push(`<div class="faixa-aviso">${A.prefs().ultimaCopiaEquipe ? 'Faz uma semana que você não guarda uma cópia da equipe fora do banco.' : 'Você ainda não guardou nenhuma cópia da equipe fora do banco.'} <a href="#/equipe" id="irCopias">Baixar e guardar no Drive</a></div>`);
+    if (A.sessao.acesso === 'dono' && !A.prefs().estilo && pagina === 'painel')
+      faixas.push(`<div class="faixa-estilo">${A.ic('ajustes')}<span><strong>Como você prefere trabalhar?</strong> Dá para trocar depois em Meu perfil.</span>${Object.entries(A.ESTILOS).map(([k, [n, d]]) => `<button type="button" class="btn" data-estilo="${k}" title="${d}">${n}</button>`).join('')}</div>`);
     if (A.modo === 'nuvem') { /* online não depende de cópia de segurança */ }
     else if (!A.armazenamentoOk) faixas.push(`<div class="faixa-aviso">Este navegador não está guardando os dados. Antes de fechar, baixe a cópia de segurança em <a href="#/planilha">Planilha</a>.</div>`);
     else if (A.sessao.acesso === 'dono' && A.estado.processos.length && (!A.estado.ultimaCopia || A.entre(A.estado.ultimaCopia, A.hojeIso()) > 7) && pagina !== 'planilha')
       faixas.push(`<div class="faixa-aviso">${A.estado.ultimaCopia ? 'Faz mais de uma semana desde a última cópia de segurança.' : 'Você ainda não baixou uma cópia de segurança.'} <a href="#/planilha">Baixar agora</a></div>`);
     document.getElementById('faixas').innerHTML = faixas.join('');
     const sf = document.getElementById('sairFaixa'); if (sf) sf.onclick = () => A.sair();
+    document.querySelectorAll('[data-estilo]').forEach(b => b.onclick = () => { A.definirEstilo(b.dataset.estilo); A.redesenhar(); A.avisar(b.dataset.estilo === 'simples' ? 'Pronto: jeito simples. Troque quando quiser em Meu perfil.' : 'Pronto: passo a passo. Troque quando quiser em Meu perfil.'); });
     const ic = document.getElementById('irCopias'); if (ic) ic.addEventListener('click', () => setTimeout(() => { const c = document.getElementById('copias'); if (c) A.rolarAte(c); }, 400));
     const visto = () => { A.prefs().lembreteVisto = A.hojeIso(); A.salvar(); topo(rota()); };
     const li = document.getElementById('lembIr'); if (li) li.addEventListener('click', visto);
