@@ -1,0 +1,133 @@
+MEUS PROCESSOS — guia rápido
+============================
+
+O que é
+-------
+Um painel pessoal para acompanhar os processos do setor pedagógico: o que fazer hoje,
+prazos contados a partir do evento, despachos esperando resposta, SEIs relacionados
+e o que falta atualizar na planilha do OneDrive.
+
+Funciona sem internet e sem instalar nada. Os dados ficam só neste computador.
+
+
+Duas formas de usar
+-------------------
+A) ONLINE, pela página no Claude (recomendado para usar em vários computadores)
+   - Endereço: https://claude.ai/artifact/B4rjpzEe2uSRCgxm93xRxg
+   - Funciona no site do Claude, pelo navegador, em qualquer computador.
+   - Cada pessoa entra com a própria conta do Claude (não usa código de 4 números).
+   - Os dados ficam no banco compartilhado da página: o que alguém marca aparece
+     para todos, e uma mudança não apaga a de outra pessoa.
+   - Para dar acesso a um colega: na página, use o menu Compartilhar e convide pelo
+     e-mail. Editor = pode mexer. Leitor = só vê.
+   - Em "Planilha", a lista "O que mudar" junta as mudanças de todos os painéis, e um
+     script só leva tudo para a planilha do OneDrive, cada mudança para a aba certa.
+
+B) SEM INTERNET, pelo arquivo desta pasta (index.html)
+   - Os dados ficam só no navegador daquele computador, com códigos de 4 números.
+   - Os dados das duas formas são separados.
+
+
+Como abrir pelo arquivo
+-----------------------
+1. Dê dois cliques no arquivo "index.html" desta pasta.
+2. Ele abre no navegador (Edge ou Chrome). Use sempre o MESMO navegador:
+   os dados ficam guardados nele.
+3. Dica: salve a página nos favoritos para abrir mais rápido.
+
+
+Primeiro uso
+------------
+1. Crie o seu perfil: iniciais, função e dois códigos de 4 números.
+   - Código pessoal: só seu. Entra e pode mexer em tudo.
+   - Código de consulta: para passar a quem você quiser. Só vê
+     (ou também edita, se você permitir em "Meu perfil e códigos").
+2. Leia a planilha:
+   - No OneDrive, abra a planilha de controle e vá em
+     Arquivo > Salvar como > Baixar uma cópia.
+   - No sistema, vá em "Planilha", escolha o arquivo baixado e a sua aba.
+   - Confira o que vai mudar e confirme.
+
+
+No dia a dia
+------------
+- Painel: o resumo do dia, a agenda (linha do tempo, mês ou semanas corridas)
+  e o que fazer (cartões, quadro ou foco do dia). Tudo muda em "Ver como".
+- Marque o que fez. Quando despachar algo, use "Despachei": a tarefa vai para
+  "Esperando resposta" até você marcar "Chegou resposta".
+- Clique no nome de um processo para ver tudo dele: fases, frentes, cronograma,
+  ficha em tabela, SEIs relacionados e diário. Tudo é editável.
+- "O que mudar na planilha" (tela Planilha) mostra exatamente o que passar para o
+  OneDrive. Depois de atualizar lá, clique em "Já atualizei".
+- Leia a planilha de novo sempre que quiser trazer o que os colegas mudaram.
+
+
+Levar o que você marcou para a planilha do OneDrive (script do Excel)
+-------------------------------------------------------------------
+1. Na tela "Planilha", em "O que mudar na planilha", clique em "Gerar script do Excel"
+   e depois em "Copiar o script".
+2. Abra a planilha de controle no OneDrive, pelo navegador.
+3. Se a sua aba estiver protegida: Revisão > Desproteger planilha.
+4. Automatizar > Novo script. Apague o que estiver escrito, cole e clique em Executar.
+5. No fim aparece o que mudou e os avisos (por exemplo, processo que não está na planilha).
+6. Proteja a aba de novo e, no sistema, clique em "Já rodei o script".
+O script só mexe nas colunas de acompanhamento (Feito, Pendente, Não se aplica) e acha
+cada processo pelos últimos 11 dígitos do número SEI. Ele roda direto na planilha
+compartilhada, sem baixar nem subir arquivo, então não apaga o que os colegas mudaram.
+
+
+Modo LGPD e cópia limpa
+-----------------------
+- Com "Guardar só o necessário" ligado (vem ligado), ao ler a planilha o sistema guarda
+  o SEI só com os últimos 11 dígitos, pessoas só pelas iniciais (inclusive nomes da
+  equipe que aparecem no título do curso) e não traz as observações.
+- "Baixar cópia limpa (.xlsx)" gera uma versão da planilha só com o necessário, para
+  levar a outro lugar. Confira o título dos cursos: nomes de pessoas de fora da equipe
+  (palestrantes, por exemplo) não são reconhecidos sozinhos.
+
+
+Regras de prazo
+---------------
+Na tela "Regras de prazo" ficam os passos de cada tipo de processo e quantos dias
+antes ou depois da data cada um vence. Os valores que vieram são um ponto de partida,
+para ajustar aos poucos. Depois de mudar, use "Atualizar processos" para levar as
+regras novas para os processos em andamento (o que você mudou à mão é mantido).
+
+
+Levar os dados de uma versão para a outra
+-----------------------------------------
+- Do arquivo para a online: no arquivo, Planilha > "Baixar cópia de segurança".
+  Na página do Claude, Planilha > "Trazer uma cópia para cá". Os processos entram no
+  seu painel online; os que já existem lá (mesmo SEI) são atualizados.
+- Da online para o arquivo: na página do Claude, Planilha > "Baixar cópia de segurança".
+  No arquivo, Planilha > "Restaurar uma cópia" (troca os dados deste navegador pelos da
+  cópia). Na primeira entrada, o sistema pede para criar o código de 4 números.
+
+
+Cópia de segurança (importante)
+-------------------------------
+Os dados ficam no navegador. Se o histórico do navegador for apagado, eles somem.
+Por isso:
+- Na tela "Planilha", clique em "Baixar cópia de segurança" toda semana.
+  O sistema avisa quando passar de 7 dias.
+- Guarde o arquivo .json numa pasta segura (por exemplo, no seu OneDrive).
+- Para levar tudo para outro computador: copie esta pasta inteira para lá, abra o
+  index.html e use "Restaurar uma cópia" com o último arquivo .json.
+
+
+Privacidade
+-----------
+- Nada é enviado para a internet. A planilha é lida aqui mesmo, no navegador.
+- Pessoas aparecem só pelas iniciais.
+- Os códigos ficam guardados embaralhados. Eles evitam que alguém mexa sem querer,
+  mas não são uma segurança forte: quem tiver acesso a este computador e souber
+  mexer com arquivos consegue ver os dados.
+
+
+Conteúdo da pasta
+-----------------
+index.html     a página do sistema (abra esta)
+css/           aparência
+js/            funcionamento
+lib/           peça que lê arquivos do Excel (SheetJS, licença Apache 2.0)
+fontes/        letra Atkinson Hyperlegible Next (licença SIL OFL, em fontes/OFL.txt)
