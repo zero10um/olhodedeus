@@ -327,6 +327,14 @@
     A.salvar();
     return () => { p.arquivado = antes; p.diario.pop(); A.salvar(); };
   };
+  /* Apagar de vez: some do sistema para todos. Pergunta antes e dá para desfazer logo depois. */
+  A.confirmarApagar = p => confirm(`Apagar o processo "${p.titulo}"?\n\nEle some do sistema${A.modo === 'nuvem' ? ' para toda a equipe' : ''}. Logo depois dá para desfazer; mais tarde, só pela cópia de segurança.\n\nSe ele só terminou, prefira Arquivar.`);
+  A.apagarProcesso = p => {
+    const l = A.estado.processos, pos = l.indexOf(p);
+    if (pos < 0) return () => {};
+    l.splice(pos, 1); A.salvar();
+    return () => { if (!l.includes(p)) l.splice(Math.min(pos, l.length), 0, p); A.salvar(); };
+  };
   A.tudoFeito = p => { const it = A.itensAtivos(p); return it.length > 0 && it.every(x => x.i.estado === 'feita'); };
 
   A.novoProcesso = (dados, perfilId) => {

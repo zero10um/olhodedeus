@@ -1231,3 +1231,7 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
   .fase-nav .btn { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .guia-espera > .ic { animation: none; } .guia-op { transition: none; } }
+
+.btn-apagar { color: var(--tinta-3); }
+.btn-apagar:hover, .btn-apagar:focus-visible { color: var(--critico); background: var(--critico-bg); }
+.meta .btn-perigo { color: var(--critico); }

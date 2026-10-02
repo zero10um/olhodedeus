@@ -25,7 +25,7 @@
           </div>
         </div>
         ${lista.length ? `<div class="tabela-rolagem"><table class="tabela" style="min-width:820px">
-          <thead><tr><th scope="col">Situação</th><th scope="col">Processo</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Andamento</th><th scope="col">${A.semPlanilha() ? 'Classificação' : 'Planilha'}</th></tr></thead>
+          <thead><tr><th scope="col">Situação</th><th scope="col">Processo</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Andamento</th><th scope="col">${A.semPlanilha() ? 'Classificação' : 'Planilha'}</th>${pode ? '<th scope="col"><span class="sr">Apagar</span></th>' : ''}</tr></thead>
           <tbody>${lista.map(p => {
             const s = A.situacao(p), it = A.itensAtivos(p), feitas = it.filter(x => x.i.estado === 'feita').length, m = A.mudancas(p).length, ref = A.dataRef(p);
             return `<tr class="clicavel" data-ir="${p.id}">
@@ -34,7 +34,7 @@
               <td>${A.esc(p.tipoNome || '')}</td>
               <td style="white-space:nowrap">${ref ? `${A.fmt(ref)} <span class="secundario">(${p.inicio ? 'evento' : 'limite'})</span>` : '<span class="secundario">sem data</span>'}</td>
               <td style="width:170px"><div class="progresso"><div class="barra" aria-hidden="true"><i style="width:${it.length ? Math.round(feitas / it.length * 100) : 0}%"></i></div><span>${feitas}/${it.length}</span></div></td>
-              <td>${A.semPlanilha() ? (A.classeTexto(p) ? A.esc(A.classeTexto(p)) : '<span class="selo" style="--c:var(--atencao);--cbg:var(--atencao-bg)">Classificar</span>') : m ? `<span class="selo" style="--c:var(--ok);--cbg:var(--ok-bg)">${m} para atualizar</span>` : '<span class="secundario">em dia</span>'}</td></tr>`;
+              <td>${A.semPlanilha() ? (A.classeTexto(p) ? A.esc(A.classeTexto(p)) : '<span class="selo" style="--c:var(--atencao);--cbg:var(--atencao-bg)">Classificar</span>') : m ? `<span class="selo" style="--c:var(--ok);--cbg:var(--ok-bg)">${m} para atualizar</span>` : '<span class="secundario">em dia</span>'}</td>${pode ? `<td style="width:44px"><button type="button" class="btn-icone btn-apagar" data-apagar="${p.id}" aria-label="Apagar ${A.esc(p.titulo)}" title="Apagar processo">${A.ic('lixo')}</button></td>` : ''}</tr>`;
           }).join('')}</tbody></table></div>`
           : `<p class="vazio">${todos.length ? 'Nenhum processo com esse filtro.' : (A.semPlanilha() ? 'Ainda não há processos. Crie o primeiro em "Novo processo".' : 'Ainda não há processos. Leia a planilha ou crie um processo novo.')}</p>`}
       </div>
@@ -43,7 +43,15 @@
     const bl = vista.querySelector('#buscaLista');
     bl.oninput = () => { busca = A.semAcento(bl.value); A.comFoco(A.redesenhar); const n = document.getElementById('buscaLista'); if (n) { n.setSelectionRange(n.value.length, n.value.length); } };
     vista.querySelector('#ordem').onchange = e => { ordem = e.target.value; A.mudar(A.redesenhar); };
-    vista.querySelectorAll('tr[data-ir]').forEach(tr => tr.onclick = e => { if (!e.target.closest('a')) location.hash = '#/processo/' + tr.dataset.ir; });
+    vista.querySelectorAll('tr[data-ir]').forEach(tr => tr.onclick = e => { if (!e.target.closest('a, button')) location.hash = '#/processo/' + tr.dataset.ir; });
+    vista.querySelectorAll('[data-apagar]').forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const p = A.proc(b.dataset.apagar);
+      if (!p || !A.confirmarApagar(p)) return;
+      const desfaz = A.apagarProcesso(p);
+      A.redesenhar();
+      A.avisar(`"${p.titulo}" apagado.`, () => { desfaz(); A.redesenhar(); });
+    });
     const bn = vista.querySelector('#btnNovo');
     if (bn) bn.onclick = () => { location.hash = novo ? '#/processos' : '#/processos/novo'; };
     if (novo && pode) formNovo(vista, regras);

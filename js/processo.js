@@ -147,6 +147,14 @@
     };
   }
 
+  function apagarEste() {
+    const p = proc;
+    if (!A.confirmarApagar(p)) return;
+    const desfaz = A.apagarProcesso(p);
+    location.hash = '#/processos';
+    A.avisar(`"${p.titulo}" apagado.`, () => { desfaz(); A.redesenhar(); });
+  }
+
   /* ---------- Topo ---------- */
   function desenharTopo() {
     const s = A.situacao(proc), el = vistaEl;
@@ -162,7 +170,8 @@
     document.title = `${proc.titulo} — Meus processos`;
     el.querySelector('#meta').innerHTML = `${proc.sei ? `<button type="button" class="sei" data-sei="${A.esc(proc.sei)}" title="Copiar o número completo">${A.ic('copiar', 'ic-sm')}SEI ${A.esc(A.seiCurto(proc.sei))}</button>` : '<span>Sem número SEI</span>'}
       ${proc.unidade ? `<span>Pedido por ${A.esc(proc.unidade)}</span>` : ''}${proc.entrada ? `<span>Chegou ao setor em ${A.fmt(proc.entrada)}</span>` : ''}
-      <button type="button" class="btn-texto" id="btnEditarDados" data-editar aria-expanded="${editandoDados}" aria-controls="editarDados">${A.ic('lapis', 'ic-sm')}Editar dados do processo</button>`;
+      <button type="button" class="btn-texto" id="btnEditarDados" data-editar aria-expanded="${editandoDados}" aria-controls="editarDados">${A.ic('lapis', 'ic-sm')}Editar dados do processo</button>
+      ${pode() ? `<button type="button" class="btn-texto btn-perigo" id="btnApagarProc" data-editar>${A.ic('lixo', 'ic-sm')}Apagar processo</button>` : ''}`;
     const ref = A.dataRef(proc), n = ref ? A.dias(ref) : null, o = proc.inicio ? 'até o evento' : 'até a data limite';
     const lim = A.regras(proc.dono).limites;
     const c = n === null ? 'var(--tinta-2)' : n >= 0 && n <= lim.critico ? 'var(--critico)' : n <= lim.atencao ? 'var(--atencao)' : 'var(--tinta)';
@@ -177,6 +186,7 @@
       + (proc.observacoes ? `<div style="grid-column:1/-1"><dt>Observações</dt><dd style="font-weight:400">${A.esc(proc.observacoes)}</dd></div>` : '');
     A.ligarCopiaSei(el.querySelector('#meta'));
     el.querySelector('#btnEditarDados').onclick = () => { editandoDados = !editandoDados; desenharDados(); };
+    const ap = el.querySelector('#btnApagarProc'); if (ap) ap.onclick = apagarEste;
     if (!el.dataset.classificar) el.dataset.classificar = '1', el.addEventListener('click', e => { if (e.target.closest('#classificar')) { editandoDados = true; desenharDados(); const c = vistaEl.querySelector('[name=ambito]'); if (c) { c.scrollIntoView({ block: 'center' }); c.focus(); } } });
     desenharDados();
   }
@@ -233,12 +243,7 @@
       editandoDados = false; salvarE();
       A.avisar(proc.arquivado ? 'Processo arquivado. Ele sai do painel, mas continua na lista de processos.' : 'Processo voltou para o painel.', () => { proc.arquivado = antes; proc.diario.pop(); });
     };
-    el.querySelector('#edApagar').onclick = () => {
-      const lista = A.estado.processos, pos = lista.indexOf(proc), p = proc;
-      lista.splice(pos, 1); A.salvar();
-      location.hash = '#/processos';
-      A.avisar(`"${p.titulo}" tirado do sistema.`, () => { lista.splice(pos, 0, p); });
-    };
+    el.querySelector('#edApagar').onclick = apagarEste;
     el.querySelector('form').onsubmit = e => {
       e.preventDefault();
       const f = e.target, v = {};
