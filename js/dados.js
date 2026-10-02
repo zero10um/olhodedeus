@@ -192,7 +192,26 @@
     const n = A.entre(base, dataIso);
     return { ref, dias: Math.abs(n), quando: n > 0 ? 'depois' : 'antes' };
   };
-  A.aprovado = proc => proc.previsto !== false || (proc.portao || []).every(Boolean);
+  /* Só trava quando a pessoa disse que NÃO estava previsto; dá para destravar sem esperar */
+  A.aprovado = proc => proc.previsto !== false || !!proc.destravado || (proc.portao || []).every(Boolean);
+
+  /* Sugestões de passos: aparecem embaixo de cada frente e entram com um clique.
+     Dependem do que já se sabe do processo (previsto? resposta do financeiro? externo?). */
+  A.SUGESTOES = [
+    // quando NÃO estava previsto, a autorização do PGJ e a origem do recurso ficam na pergunta do topo
+    { f: 'instrucao', se: p => p.previsto !== false || A.aprovado(p), nome: 'Despachar ao setor financeiro para iniciar os trâmites', dias: 50 },
+    { f: 'financeira', se: p => !p.financeiro, nome: 'Pedir a estimativa de custo ao setor financeiro', dias: 50 },
+    { f: 'financeira', se: p => p.financeiro === 'remanejar' || p.recurso === 'remanejamento', nome: 'Avisar a DOF sobre o remanejamento', dias: 45 },
+    { f: 'financeira', se: p => p.financeiro === 'suplementar' || p.recurso === 'suplementacao', nome: 'Pedir a suplementação orçamentária', dias: 45 },
+    { f: 'contratacao', se: p => p.financeiro === 'tem', nome: 'Iniciar a contratação', dias: 45 },
+    { f: 'deslocamento', se: p => p.ambito === 'externo', nome: 'Pagar as diárias', dias: 10 },
+    { f: 'deslocamento', se: p => p.ambito === 'externo', nome: 'Emitir as passagens', dias: 20 },
+  ];
+  A.sugestoesDe = (p, f) => {
+    const tem = new Set(f.itens.map(i => A.semAcento(i.nome)));
+    return A.SUGESTOES.filter(s => s.f === f.modeloId && s.se(p) && !tem.has(A.semAcento(s.nome)));
+  };
+  A.RESPOSTA_FIN = { tem: 'Tem recurso', remanejar: 'Precisa remanejar', suplementar: 'Precisa suplementar' };
   A.travada = (proc, f) => f.fase !== 'inicio' && !A.aprovado(proc);
   A.itensAtivos = proc => proc.frentes.filter(f => !f.na && !A.travada(proc, f)).flatMap(f => f.itens.filter(i => !i.na).map(i => ({ proc, f, i })));
   A.despachoAberto = (proc, item) => proc.despachos.find(a => a.itemId === item.id && !a.resposta);
@@ -318,7 +337,7 @@
       unidade: dados.unidade || '', entrada: dados.entrada || A.hojeIso(), inicio: dados.inicio || '', fim: dados.fim || dados.inicio || '',
       limite: dados.limite || '', horario: dados.horario || '', modalidade: dados.modalidade || '', local: dados.local || '', apoio: A.lgpd() ? A.iniciais(dados.apoio) : (dados.apoio || ''),
       ambito: dados.ambito || '', publico: dados.publico || '',
-      previsto: true, portao: [false, false, false], situacaoPlanilha: '', arquivado: false, observacoes: dados.observacoes || '',
+      previsto: null, recurso: '', financeiro: '', portao: [false, false, false], situacaoPlanilha: '', arquivado: false, observacoes: dados.observacoes || '',
       frentes: [], despachos: [], seis: [], diario: [], naPlanilha: {}, origem: dados.origem || 'manual',
       criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(),
     };

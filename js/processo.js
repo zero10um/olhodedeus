@@ -298,11 +298,14 @@
         ${A.seloFrente(e)}<svg class="ic seta" aria-hidden="true"><use href="#i-seta"/></svg></button>
       <div class="recolhivel${aberta ? '' : ' fechado'}" id="fc-${f.id}"><div ${aberta ? '' : 'inert'}><div class="frente-corpo">
         ${e === 'travada' ? `<p class="trava">${A.ic('cadeado')} Liberada depois da aprovação, na fase Início.</p>` : ''}
+        ${f.modeloId === 'financeira' && !f.na && e !== 'travada' ? `<div class="pergunta pergunta-fin"><div><h3>O que o financeiro respondeu?</h3><p class="secundario">Muda as sugestões abaixo e na contratação.</p></div>
+          <div class="segmento" role="radiogroup" aria-label="O que o financeiro respondeu?">${[['', 'Ainda não'], ...Object.entries(A.RESPOSTA_FIN)].map(([v, n]) => `<label><input type="radio" name="fin-${f.id}" value="${v}" ${(proc.financeiro || '') === v ? 'checked' : ''} ${pode() ? '' : 'disabled'}><span>${n}</span></label>`).join('')}</div></div>` : ''}
         ${f.na ? `<p class="na-txt">Marcada como "não se aplica". Na planilha, fica cinza.</p>` : `<ul class="tarefas">${it.map(i => linhaTarefa(f, i)).join('') || '<li class="vazio">Nenhum passo. Use "Adicionar passo".</li>'}</ul>`}
         ${seisF.length ? `<div class="seis-frente">${seisF.map(s => `<span class="sei-chip">${A.esc(s.tipo)} ${A.esc(A.seiCurto(s.numero))}</span>`).join('')}</div>` : ''}
+        ${!f.na && e !== 'travada' && pode() && A.sugestoesDe(proc, f).length ? `<div class="sugestoes" data-editar><span class="sugestoes-rot">Sugestões</span>${A.sugestoesDe(proc, f).map((s, k) => `<button type="button" class="sugestao" data-sugestao="${f.id}|${k}">${A.ic('mais', 'ic-sm')}${A.esc(s.nome)}</button>`).join('')}</div>` : ''}
         <div class="frente-pe" data-editar>
           ${f.fase === 'inicio' ? '<span></span>' : `<label class="chave"><input type="checkbox" data-na="${f.id}" ${f.na ? 'checked' : ''} ${e === 'travada' && !f.na ? 'disabled' : ''}> Não se aplica a este processo</label>`}
-          ${f.na || e === 'travada' ? '' : `<button type="button" class="btn-texto" data-novo="${f.id}">${A.ic('mais', 'ic-sm')}Adicionar passo</button>`}
+          ${f.na || e === 'travada' ? '' : `<span style="display:inline-flex;gap:12px;flex-wrap:wrap">${it.some(t => t.estado !== 'feita') && it.length > 1 ? `<button type="button" class="btn-texto" data-tudo="${f.id}">${A.ic('check', 'ic-sm')}Marcar todos como feitos</button>` : ''}<button type="button" class="btn-texto" data-novo="${f.id}">${A.ic('mais', 'ic-sm')}Adicionar passo</button></span>`}
         </div><div id="novo-${f.id}"></div>
       </div></div></div></article>`;
   }
@@ -310,14 +313,17 @@
     const tipo = A.tipo(proc);
     if (tipo && !tipo.aprovacao && proc.previsto !== false) return '';
     const ok = A.aprovado(proc), dis = pode() ? '' : 'disabled';
-    const passos = ['Fazer as estimativas de custo', 'Enviar para a unidade superior', 'Unidade orçamentária confirma que há dinheiro'];
+    const passos = ['Fazer a estimativa de custo', 'Pedir autorização ao PGJ', 'Autorização recebida'];
+    const op = (nome, v, atual, rot) => `<label><input type="radio" name="${nome}" value="${v}" ${atual ? 'checked' : ''} ${dis}><span>${rot}</span></label>`;
     return `<div class="portao" style="view-transition-name:portao">
-      <div class="pergunta"><div><h3>Estava previsto no plano?</h3><p class="secundario">Se não estava, precisa de aprovação antes de começar as outras frentes.</p></div>
+      <div class="pergunta"><div><h3>Estava previsto no plano?</h3><p class="secundario">Não é obrigatório responder. Se não estava, o sistema sugere os passos de autorização.</p></div>
         <div class="segmento" role="radiogroup" aria-label="Estava previsto no plano?">
-          <label><input type="radio" name="previsto" value="sim" ${proc.previsto !== false ? 'checked' : ''} ${dis}><span>Sim</span></label>
-          <label><input type="radio" name="previsto" value="nao" ${proc.previsto === false ? 'checked' : ''} ${dis}><span>Não</span></label></div></div>
-      ${proc.previsto !== false ? '' : `<ul class="tarefas entra" style="margin-top:12px">${passos.map((p, i) => `<li class="tarefa${proc.portao[i] ? ' feita' : ''}"><input type="checkbox" id="pt-${i}" data-portao="${i}" ${proc.portao[i] ? 'checked' : ''} ${dis}><label class="o-que" for="pt-${i}">${p}</label><span class="prazo">${proc.portao[i] ? 'feito' : ''}</span></li>`).join('')}</ul>`}
-      <p class="liberado${ok ? '' : ' nao'}">${ok ? A.ic('feito') + ' Liberado: as frentes da preparação podem andar ao mesmo tempo.' : A.ic('cadeado') + ' Esperando a aprovação. As frentes da preparação ficam travadas.'}</p></div>`;
+          ${op('previsto', 'sim', proc.previsto === true, 'Sim')}${op('previsto', 'nao', proc.previsto === false, 'Não')}${op('previsto', 'nsei', proc.previsto == null, 'Ainda não sei')}</div></div>
+      ${proc.previsto !== false ? '' : `<div class="pergunta" style="margin-top:12px"><div><h3>De onde vem o recurso?</h3><p class="secundario">Remanejamento: tira de outro evento e avisa a DOF.</p></div>
+        <div class="segmento" role="radiogroup" aria-label="De onde vem o recurso?">${op('recurso', 'suplementacao', proc.recurso === 'suplementacao', 'Suplementação')}${op('recurso', 'remanejamento', proc.recurso === 'remanejamento', 'Remanejamento')}${op('recurso', '', !proc.recurso, 'Ainda não sei')}</div></div>
+        <ul class="tarefas entra" style="margin-top:12px">${passos.map((p, i) => `<li class="tarefa${proc.portao[i] ? ' feita' : ''}"><input type="checkbox" id="pt-${i}" data-portao="${i}" ${proc.portao[i] ? 'checked' : ''} ${dis}><label class="o-que" for="pt-${i}">${p}</label><span class="prazo">${proc.portao[i] ? 'feito' : ''}</span></li>`).join('')}</ul>`}
+      <p class="liberado${ok ? '' : ' nao'}">${ok ? A.ic('feito') + (proc.previsto === false && proc.destravado && !(proc.portao || []).every(Boolean) ? ' Destravado sem esperar a autorização.' : ' Liberado: as frentes da preparação podem andar ao mesmo tempo.')
+        : A.ic('cadeado') + ` Esperando a autorização. As frentes da preparação ficam travadas.${pode() ? ' <button type="button" class="btn-texto" id="destravar">Destravar mesmo assim</button>' : ''}`}</p></div>`;
   }
   function desenharFases(el) {
     el.innerHTML = fasesVisiveis().map((fa, i) => {
@@ -367,9 +373,40 @@
       A.avisar(f.na ? `${f.nome} marcada como "não se aplica".` : `${f.nome} voltou para o processo.`, () => { f.na = antes; proc.diario.pop(); });
     });
     el.querySelectorAll('[name=previsto]').forEach(r => r.onchange = () => {
-      proc.previsto = r.value === 'sim';
-      A.anotar(proc, 'Sistema', proc.previsto ? 'Marcado como previsto no plano.' : 'Marcado como não previsto: precisa de aprovação.');
+      proc.previsto = r.value === 'sim' ? true : r.value === 'nao' ? false : null;
+      // responder a pergunta já conta como o passo "Conferir se a ação está prevista no plano"
+      proc.frentes.forEach(f => f.itens.forEach(i => { if (/prevista no plano/.test(A.semAcento(i.nome)) && !i.na) { i.estado = proc.previsto == null ? 'aberta' : 'feita'; i.feitoEm = proc.previsto == null ? undefined : A.hojeIso(); } }));
+      A.anotar(proc, 'Sistema', proc.previsto === true ? 'Marcado como previsto no plano.' : proc.previsto === false ? 'Marcado como não previsto: precisa de autorização.' : 'Previsão no plano ainda não sabida.');
       salvarE();
+    });
+    el.querySelectorAll('[name=recurso]').forEach(r => r.onchange = () => {
+      proc.recurso = r.value;
+      A.anotar(proc, 'Sistema', r.value ? `Recurso por ${r.value === 'suplementacao' ? 'suplementação' : 'remanejamento'}.` : 'Origem do recurso ainda não sabida.');
+      salvarE();
+    });
+    const dt = el.querySelector('#destravar');
+    if (dt) dt.onclick = () => { proc.destravado = true; A.anotar(proc, 'Sistema', 'Frentes destravadas sem esperar a autorização.'); salvarE(); A.avisar('Frentes destravadas.', () => { proc.destravado = false; proc.diario.pop(); salvarE(); }); };
+    el.querySelectorAll('[name^=fin-]').forEach(r => r.onchange = () => {
+      proc.financeiro = r.value;
+      A.anotar(proc, 'Sistema', r.value ? `Resposta do financeiro: ${A.RESPOSTA_FIN[r.value].toLowerCase()}.` : 'Resposta do financeiro ainda não chegou.');
+      salvarE();
+    });
+    el.querySelectorAll('[data-sugestao]').forEach(b => b.onclick = () => {
+      const [fid, k] = b.dataset.sugestao.split('|'), fr = F(fid), s = A.sugestoesDe(proc, fr)[+k]; if (!s) return;
+      const novo = { id: 'i' + A.uid(), modeloId: null, nome: s.nome, regra: { dias: s.dias || 7, quando: 'antes', ref: proc.inicio ? 'inicio' : 'limite' }, estado: 'aberta', coluna: null, na: false, editado: true };
+      fr.itens.push(novo);
+      A.anotar(proc, 'Sistema', `Passo sugerido adicionado em ${fr.nome}: ${novo.nome}.`);
+      salvarE();
+      A.avisar(`"${novo.nome}" entrou na lista.`, () => { fr.itens = fr.itens.filter(t => t !== novo); proc.diario.pop(); salvarE(); });
+    });
+    el.querySelectorAll('[data-tudo]').forEach(b => b.onclick = () => {
+      const fr = F(b.dataset.tudo), abertos = fr.itens.filter(i => !i.na && i.estado !== 'feita');
+      const antes = abertos.map(i => [i, i.estado, i.feitoEm]);
+      abertos.forEach(i => { i.estado = 'feita'; i.feitoEm = A.hojeIso(); });
+      A.anotar(proc, 'Sistema', `${fr.nome}: todos os passos marcados como feitos.`);
+      salvarE();
+      const n = abertos.length, s = n > 1 ? 's' : '';
+      A.avisar(`${fr.nome}: ${n} passo${s} marcado${s} como feito${s}.`, () => { antes.forEach(([i, e, d]) => { i.estado = e; i.feitoEm = d; }); proc.diario.pop(); salvarE(); });
     });
     el.querySelectorAll('[data-portao]').forEach(cb => cb.onchange = () => {
       const i = +cb.dataset.portao, antes = A.aprovado(proc);

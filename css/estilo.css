@@ -1159,3 +1159,14 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .faixa-arquivar > .ic { color: var(--ok); }
 .faixa-arquivar span { flex: 1 1 320px; font-size: var(--t-sm); }
 @media (max-width: 760px) { .avisos-painel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; } }
+
+/* Sugestões de passos e pergunta do financeiro */
+.sugestoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: var(--e-3); padding-top: var(--e-2); border-top: 1px dotted var(--linha); }
+.sugestoes-rot { font-size: 12px; font-weight: 650; font-stretch: 78%; text-transform: uppercase; letter-spacing: .07em; color: var(--tinta-2); margin-right: 2px; }
+.sugestao { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--borda-campo); background: var(--folha); color: var(--tinta); font: inherit; font-size: var(--t-sm);
+  padding: 4px 10px; cursor: pointer; border-radius: 2px; transition: border-color .15s, background-size .3s cubic-bezier(.16, 1, .3, 1);
+  background-image: linear-gradient(var(--grifo-aqui), var(--grifo-aqui)); background-repeat: no-repeat; background-size: 0% 100%; }
+.sugestao:hover, .sugestao:focus-visible { border-style: solid; border-color: var(--tinta); background-size: 100% 100%; }
+.sugestao .ic { color: var(--caneta); }
+.pergunta-fin { margin-bottom: var(--e-3); padding-bottom: var(--e-3); border-bottom: 1px dotted var(--linha); }
+.pergunta-fin .segmento span { min-width: 0; }
