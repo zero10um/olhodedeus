@@ -204,6 +204,8 @@
     { f: 'financeira', se: p => p.financeiro === 'remanejar' || p.recurso === 'remanejamento', nome: 'Avisar a DOF sobre o remanejamento', dias: 45 },
     { f: 'financeira', se: p => p.financeiro === 'suplementar' || p.recurso === 'suplementacao', nome: 'Pedir a suplementação orçamentária', dias: 45 },
     { f: 'contratacao', se: p => p.financeiro === 'tem', nome: 'Iniciar a contratação', dias: 45 },
+    { f: 'local', se: p => p.ambito !== 'externo', nome: 'Pedir o coffee break à GCI (em SEI relacionado)', dias: 20 },
+    { f: 'local', se: p => (p.roteiro || []).length > 0, nome: 'Despachar às comarcas: datas e o que preparar (em SEI relacionado)', dias: 20 },
     { f: 'deslocamento', se: p => p.ambito === 'externo', nome: 'Pagar as diárias', dias: 10 },
     { f: 'deslocamento', se: p => p.ambito === 'externo', nome: 'Emitir as passagens', dias: 20 },
   ];

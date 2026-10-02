@@ -1235,3 +1235,11 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .btn-apagar { color: var(--tinta-3); }
 .btn-apagar:hover, .btn-apagar:focus-visible { color: var(--critico); background: var(--critico-bg); }
 .meta .btn-perigo { color: var(--critico); }
+
+/* Roteiro (vários lugares no mesmo evento) */
+.roteiro { background: var(--folha); border: 1px solid var(--linha); padding: var(--e-4); margin-bottom: var(--e-3); }
+.roteiro-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e-3); flex-wrap: wrap; margin-bottom: var(--e-3); }
+.roteiro-topo h3 { font-size: var(--t-lg); font-weight: 800; }
+.roteiro-tab td { padding: 4px 6px; }
+.roteiro-tab .cel { width: 100%; min-width: 110px; border: 1px solid var(--linha); background: var(--folha); padding: 5px 8px; font: inherit; font-size: var(--t-sm); }
+.roteiro-tab td:nth-child(4) .cel { min-width: 220px; }

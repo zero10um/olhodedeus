@@ -38,7 +38,7 @@
   /* Cada processo com data vira um evento da agenda */
   function eventos() {
     const hoje = A.hojeIso();
-    return A.estado.processos.filter(p => p.inicio).map(p => {
+    return A.estado.processos.filter(p => p.inicio).flatMap(p => {
       const quem = A.perfil(p.dono) || { ini: '?', cor: 'var(--neutro)', bg: 'var(--neutro-bg)' };
       const frentes = p.frentes.map(f => {
         const e = A.estadoFrente(p, f);
@@ -56,8 +56,12 @@
         const s = A.situacao(p);
         sit = { c: s === 'critico' ? 'critico' : s === 'atencao' ? 'atencao' : 'emdia', txt: `Falta${n > 1 ? 'm' : ''} ${n}`, longo: `Falta${n > 1 ? 'm' : ''} ${n} ite${n > 1 ? 'ns' : 'm'} da preparação` };
       }
-      return { p, id: p.id, t: p.titulo, quem, ini: p.inicio, fim, h: hr ? hr.h : null, hf: hr ? hr.hf : null, aprox: hr && hr.aprox,
+      const base = { p, id: p.id, t: p.titulo, quem, ini: p.inicio, fim, h: hr ? hr.h : null, hf: hr ? hr.hf : null, aprox: hr && hr.aprox,
         local: p.local || (p.modalidade && /online|on-line|ead|remot/i.test(p.modalidade) ? 'On-line' : ''), frentes, sala, sit, conflitos: A.conflitosSala(p) };
+      const paradas = (p.roteiro || []).filter(x => x.data);
+      if (!paradas.length) return [base];
+      return paradas.map((x, k) => { const h2 = horas(x.horario || p.horario);
+        return { ...base, id: `${p.id}~${k}`, t: `${p.titulo} (${k + 1}/${paradas.length})`, ini: x.data, fim: x.data, h: h2 ? h2.h : null, hf: h2 ? h2.hf : null, aprox: h2 && h2.aprox, local: x.local || base.local, conflitos: [] }; });
     });
   }
 

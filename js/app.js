@@ -160,7 +160,7 @@
 
   async function iniciar() {
     A.ligarAviso();
-    document.getElementById('lista-setores').innerHTML = ['GCI', 'Unidade orçamentária', 'Setor financeiro', 'Setor de viagens', 'Unidade superior', 'Gabinete'].map(s => `<option value="${s}">`).join('');
+    document.getElementById('lista-setores').innerHTML = ['Setor financeiro (EMPRO)', 'Administração e apoio técnico (EMPRO)', 'PGJ', 'COPLAN', 'DOF', 'DAC', 'Secretaria-Geral', 'GCI', 'Corregedoria-Geral', 'DTI', 'Comarcas', 'Setor de viagens', 'Gabinete'].map(s => `<option value="${s}">`).join('');
     let online = false;
     if (A.supa && A.supa.disponivel()) {
       vista().innerHTML = `<main class="estreito"><p class="secundario" role="status">Conectando…</p></main>`;

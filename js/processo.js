@@ -6,7 +6,8 @@
     { v: 'ficha', t: 'Ficha em tabela', d: 'Tudo numa tabela, como a planilha. Edite direto: salva sozinho.', ic: 'v-tabela' },
   ];
   const ESTADOS = [['aberta', 'A fazer'], ['esperando', 'Esperando resposta'], ['feita', 'Feito']];
-  const TIPOS_SEI = ['Deslocamento', 'Portaria', 'DFD', 'TR', 'Apoio', 'Pagamento', 'Certificados', 'Outro'];
+  const TIPOS_SEI = ['Deslocamento', 'Portaria', 'DFD', 'TR', 'Contratação', 'Coffee break', 'Comarcas', 'Apoio', 'Pagamento', 'Certificados', 'Outro'];
+  const tipoSeiDe = nome => { const n = A.semAcento(nome); return /coffee/.test(n) ? 'Coffee break' : /comarca/.test(n) ? 'Comarcas' : /dfd/.test(n) ? 'DFD' : /\btr\b/.test(n) ? 'TR' : /contrat/.test(n) ? 'Contratação' : /diaria|passag|desloc/.test(n) ? 'Deslocamento' : /portaria/.test(n) ? 'Portaria' : /certific/.test(n) ? 'Certificados' : /pagam|empenh/.test(n) ? 'Pagamento' : 'Outro'; };
   const SUB_FASE = { inicio: 'Ver se estava previsto, abrir o processo e dar o primeiro despacho.', prep: 'Depois de aprovado, cada frente anda ao mesmo tempo, com seu próprio despacho.', evento: '', pos: 'Depois do evento: certificados, exonerados e pagamentos.', fim: 'Os últimos lançamentos antes de fechar o processo.' };
 
   let proc = null, vistaEl = null;
@@ -103,6 +104,7 @@
       <div class="dois"><div class="campo"><label for="fs-${i.id}">Enviado para</label><input id="fs-${i.id}" name="setor" list="lista-setores" value="${A.esc(palpiteSetor(i))}" placeholder="GCI"><div class="erro" hidden>Diga para onde o despacho foi.</div></div>
         <div class="campo"><label for="fd-${i.id}">Enviado em</label><input id="fd-${i.id}" name="data" type="date" value="${A.hojeIso()}" max="${A.hojeIso()}"></div></div>
       <div class="campo"><label for="ft-${i.id}">O que foi pedido ou combinado <small>(opcional)</small></label><textarea id="ft-${i.id}" name="texto"></textarea></div>
+      <div class="campo"><label for="fsei-${i.id}">Abriu um SEI relacionado para isso? <small>(opcional: cole o número)</small></label><input id="fsei-${i.id}" name="seiRel" placeholder="19.25.000000000.0000000/2026-00"></div>
       <div class="form-botoes"><button class="btn btn-primario" type="submit">Salvar e esperar resposta</button><button class="btn" type="button" data-cancelar>Cancelar</button></div>
     </form>`;
   }
@@ -317,6 +319,47 @@
         </div><div id="novo-${f.id}"></div>
       </div></div></div></article>`;
   }
+  /* ---------- Roteiro: vários lugares e dias dentro do mesmo evento ---------- */
+  function roteiroHTML() {
+    const r = proc.roteiro || [], dis = pode() ? '' : 'disabled';
+    return `<section class="roteiro" aria-labelledby="t-roteiro">
+      <div class="roteiro-topo"><div><h3 id="t-roteiro">Roteiro</h3><p class="secundario">Quando o evento passa por vários lugares (por exemplo, comarcas do interior). Cada parada aparece na Agenda.</p></div>
+        ${r.length ? `<button type="button" class="btn" id="rotTexto">${A.ic('copiar')} Copiar texto do despacho às comarcas</button>` : ''}</div>
+      ${r.length ? `<div class="tabela-rolagem"><table class="tabela roteiro-tab"><thead><tr><th scope="col">Lugar</th><th scope="col">Dia</th><th scope="col">Horário</th><th scope="col">O que o local precisa preparar</th><th scope="col"><span class="sr">Tirar</span></th></tr></thead><tbody>
+        ${r.map((x, k) => `<tr><td><input class="cel" data-rot="${k}:local" value="${A.esc(x.local || '')}" list="lista-salas" aria-label="Lugar da parada ${k + 1}" ${dis}></td>
+          <td><input class="cel" type="date" data-rot="${k}:data" value="${A.esc(x.data || '')}" aria-label="Dia da parada ${k + 1}" ${dis}></td>
+          <td><input class="cel" data-rot="${k}:horario" value="${A.esc(x.horario || '')}" placeholder="${A.esc(proc.horario || '14h às 17h')}" aria-label="Horário da parada ${k + 1}" ${dis}></td>
+          <td><input class="cel" data-rot="${k}:preparar" value="${A.esc(x.preparar || '')}" placeholder="sala com projetor, lista de presença…" aria-label="O que preparar na parada ${k + 1}" ${dis}></td>
+          <td>${pode() ? `<button type="button" class="btn-icone btn-apagar" data-rot-tirar="${k}" aria-label="Tirar a parada ${k + 1}">${A.ic('lixo')}</button>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : ''}
+      ${pode() ? `<button type="button" class="btn-texto" id="rotMais">${A.ic('mais', 'ic-sm')}${r.length ? 'Mais uma parada' : 'Este evento passa por vários lugares'}</button>` : ''}
+    </section>`;
+  }
+  function ligarRoteiro(el) {
+    const r = () => proc.roteiro || (proc.roteiro = []);
+    const mais = el.querySelector('#rotMais');
+    if (mais) mais.onclick = () => {
+      const ult = r()[r().length - 1];
+      r().push({ id: 'r' + A.uid(), local: '', data: ult && ult.data ? A.somar(ult.data, 1) : (proc.inicio || ''), horario: ult ? ult.horario : (proc.horario || ''), preparar: ult ? ult.preparar : '' });
+      A.anotar(proc, 'Sistema', 'Parada acrescentada ao roteiro.'); salvarE().then(() => { const c = vistaEl.querySelector(`[data-rot="${r().length - 1}:local"]`); if (c) c.focus(); });
+    };
+    el.querySelectorAll('[data-rot]').forEach(inp => inp.onchange = () => {
+      const [k, campo] = inp.dataset.rot.split(':'); r()[+k][campo] = inp.value.trim();
+      const datas = r().map(x => x.data).filter(Boolean).sort();
+      if (datas.length && (!proc.inicio || datas[0] < proc.inicio)) proc.inicio = datas[0];
+      if (datas.length && (!proc.fim || datas[datas.length - 1] > proc.fim)) proc.fim = datas[datas.length - 1];
+      A.salvar();
+    });
+    el.querySelectorAll('[data-rot-tirar]').forEach(b => b.onclick = () => {
+      const k = +b.dataset.rotTirar, x = r()[k]; r().splice(k, 1);
+      salvarE(); A.avisar('Parada tirada do roteiro.', () => { r().splice(k, 0, x); salvarE(); });
+    });
+    const tx = el.querySelector('#rotTexto');
+    if (tx) tx.onclick = () => {
+      const linhas = r().filter(x => x.local || x.data).map(x => `- ${x.local || 'local a definir'}: ${x.data ? `${A.semana(x.data)}, ${A.fmtAno(x.data)}` : 'data a definir'}${x.horario || proc.horario ? `, ${x.horario || proc.horario}` : ''}${x.preparar ? `. Preparar: ${x.preparar}` : ''}.`);
+      A.copiar(`Informamos que a equipe da EMPRO realizará "${proc.titulo}" nas datas e locais abaixo:\n\n${linhas.join('\n')}\n\nSolicitamos, por gentileza, que cada unidade providencie o que está indicado e confirme a disponibilidade do espaço.`, 'Texto do despacho copiado. É só colar no SEI.');
+    };
+  }
   function portaoHTML() {
     const tipo = A.tipo(proc);
     if (tipo && !tipo.aprovacao && proc.previsto !== false) return '';
@@ -360,7 +403,7 @@
       if (uma && fa.id !== naTela) return '';
       const fr = proc.frentes.filter(f => f.fase === fa.id);
       let corpo = '';
-      if (fa.id === 'evento') corpo = `<div class="portao"><p><strong>${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}</strong>${proc.horario ? ', ' + A.esc(proc.horario) : ''}${proc.local ? ', ' + A.esc(proc.local) : ''}.</p><p class="secundario" style="margin-top:4px">${A.dias(proc.inicio) > 0 ? `Faltam ${A.dias(proc.inicio)} dias. Os prazos das outras fases são contados a partir destas datas.` : 'O evento já começou.'}</p></div>`;
+      if (fa.id === 'evento') corpo = roteiroHTML() + `<div class="portao"><p><strong>${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}</strong>${proc.horario ? ', ' + A.esc(proc.horario) : ''}${proc.local ? ', ' + A.esc(proc.local) : ''}.</p><p class="secundario" style="margin-top:4px">${A.dias(proc.inicio) > 0 ? `Faltam ${A.dias(proc.inicio)} dias. Os prazos das outras fases são contados a partir destas datas.` : 'O evento já começou.'}</p></div>`;
       else if (fa.id === 'inicio' && A.guiaAplica(proc)) {
         const nPassos = fr.reduce((s, f) => s + f.itens.filter(x => !x.na).length, 0);
         corpo = A.guiaHTML(proc, pode()) + `<details class="guia-lista"${A.prefs().guiaListaAberta ? ' open' : ''}><summary>Ver todos os passos do início (${nPassos})</summary>${portaoHTML()}<div class="frentes">${fr.map(frenteHTML).join('')}</div></details>`;
@@ -376,6 +419,7 @@
     ligarFases(el);
     el.querySelectorAll('[data-fase]').forEach(b => b.onclick = () => irParaFase(b.dataset.fase));
     el.querySelector('#todasFases').onclick = () => { A.prefs().todasFases = !A.prefs().todasFases; A.salvar(); desenharCaminho(); desenharConteudo(); };
+    ligarRoteiro(el);
     const gl = el.querySelector('.guia-lista'); if (gl) gl.ontoggle = () => { A.prefs().guiaListaAberta = gl.open; A.salvar(); };
     const guia = el.querySelector('.guia');
     if (guia) A.guiaLigar(guia, proc, { redesenhar: () => { faseVista = 'inicio'; A.salvar(); desenhar(); }, irParaFase: id => { desenharTopo(); irParaFase(id); } });
@@ -407,6 +451,8 @@
       f.onsubmit = e => {
         e.preventDefault();
         if (!campo.value.trim()) { campo.setAttribute('aria-invalid', 'true'); erro.hidden = false; campo.focus(); return; }
+        const rel = (f.elements.seiRel.value || '').trim();
+        if (rel) proc.seis.push({ id: 's' + A.uid(), tipo: tipoSeiDe(x.i.nome), numero: A.seiGuardar(rel), desc: x.i.nome, f: x.f.id });
         salvarDespacho(x.i, campo.value.trim(), f.elements.texto.value.trim(), f.elements.data.value || A.hojeIso());
       };
     });
