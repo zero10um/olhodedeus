@@ -25,7 +25,7 @@
           </div>
         </div>
         ${lista.length ? `<div class="tabela-rolagem"><table class="tabela" style="min-width:820px">
-          <thead><tr><th scope="col">Situação</th><th scope="col">Processo</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Andamento</th><th scope="col">Planilha</th></tr></thead>
+          <thead><tr><th scope="col">Situação</th><th scope="col">Processo</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Andamento</th><th scope="col">${A.semPlanilha() ? 'Classificação' : 'Planilha'}</th></tr></thead>
           <tbody>${lista.map(p => {
             const s = A.situacao(p), it = A.itensAtivos(p), feitas = it.filter(x => x.i.estado === 'feita').length, m = A.mudancas(p).length, ref = A.dataRef(p);
             return `<tr class="clicavel" data-ir="${p.id}">
@@ -34,9 +34,9 @@
               <td>${A.esc(p.tipoNome || '')}</td>
               <td style="white-space:nowrap">${ref ? `${A.fmt(ref)} <span class="secundario">(${p.inicio ? 'evento' : 'limite'})</span>` : '<span class="secundario">sem data</span>'}</td>
               <td style="width:170px"><div class="progresso"><div class="barra" aria-hidden="true"><i style="width:${it.length ? Math.round(feitas / it.length * 100) : 0}%"></i></div><span>${feitas}/${it.length}</span></div></td>
-              <td>${m ? `<span class="selo" style="--c:var(--ok);--cbg:var(--ok-bg)">${m} para atualizar</span>` : '<span class="secundario">em dia</span>'}</td></tr>`;
+              <td>${A.semPlanilha() ? (A.classeTexto(p) ? A.esc(A.classeTexto(p)) : '<span class="selo" style="--c:var(--atencao);--cbg:var(--atencao-bg)">Classificar</span>') : m ? `<span class="selo" style="--c:var(--ok);--cbg:var(--ok-bg)">${m} para atualizar</span>` : '<span class="secundario">em dia</span>'}</td></tr>`;
           }).join('')}</tbody></table></div>`
-          : `<p class="vazio">${todos.length ? 'Nenhum processo com esse filtro.' : 'Ainda não há processos. Leia a planilha ou crie um processo novo.'}</p>`}
+          : `<p class="vazio">${todos.length ? 'Nenhum processo com esse filtro.' : (A.semPlanilha() ? 'Ainda não há processos. Crie o primeiro em "Novo processo".' : 'Ainda não há processos. Leia a planilha ou crie um processo novo.')}</p>`}
       </div>
     </main>`;
     vista.querySelectorAll('[name=filtro]').forEach(r => r.onchange = () => { filtro = r.value; A.mudar(A.redesenhar); });
@@ -54,6 +54,19 @@
     el.innerHTML = `<form class="cartao-form" id="fNovo" novalidate aria-labelledby="t-novo">
       <h2 id="t-novo">Novo processo</h2>
       <p class="secundario" style="margin-bottom:16px">Os passos vêm das Regras de prazo do tipo escolhido. Dá para mudar tudo depois.</p>
+      <fieldset class="classifica" id="nClasse">
+        <legend>Antes de tudo: classificação</legend>
+        <div class="classifica-grupo" role="radiogroup" aria-labelledby="rAmb">
+          <p class="classifica-rot" id="rAmb">Onde acontece</p>
+          ${Object.entries(A.AMBITOS).map(([k, [n, d]]) => `<label class="opcao-ficha"><input type="radio" name="nAmbito" value="${k}"><span><strong>${n}</strong><small>${d}</small></span></label>`).join('')}
+        </div>
+        <div class="classifica-grupo" role="radiogroup" aria-labelledby="rPub">
+          <p class="classifica-rot" id="rPub">Para quem</p>
+          ${Object.entries(A.PUBLICOS).map(([k, n]) => `<label class="opcao-ficha"><input type="radio" name="nPublico" value="${k}"><span><strong>${n}</strong></span></label>`).join('')}
+        </div>
+        <p class="classifica-dica secundario" id="nClasseDica">Interno: a escola emite os certificados. Externo: o servidor apresenta o certificado, e sala, divulgação e contratação ficam como "não se aplica".</p>
+        <div class="erro" id="nClasseErro" hidden></div>
+      </fieldset>
       <div class="grade-campos">
         <div class="campo largo"><label for="nTitulo">Nome do curso ou evento</label><input id="nTitulo"><div class="erro" hidden></div></div>
         <div class="campo"><label for="nTipo">Tipo</label><select id="nTipo">${regras.tipos.map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></div>
@@ -73,6 +86,7 @@
     const f = el.querySelector('#fNovo');
     const mostrar = () => { const t = regras.tipos.find(x => x.id === f.querySelector('#nTipo').value); f.querySelectorAll('[data-so]').forEach(c => c.hidden = c.dataset.so !== (t.ref === 'evento' ? 'evento' : 'limite')); };
     f.querySelector('#nTipo').onchange = mostrar; mostrar();
+    f.querySelectorAll('[name=nAmbito], [name=nPublico]').forEach(r => r.onchange = () => { f.querySelector('#nClasseErro').hidden = true; });
     const vai = f.querySelector('#nSeiVai');
     f.querySelector('#nSei').addEventListener('input', e => {
       const v = e.target.value.trim(), d = v.replace(/\D/g, '');
@@ -86,6 +100,10 @@
       e.preventDefault();
       const v = id => f.querySelector('#' + id).value.trim();
       const erro = (id, t) => { const c = f.querySelector('#' + id), m = c.parentElement.querySelector('.erro'); c.setAttribute('aria-invalid', 'true'); m.textContent = t; m.hidden = false; c.focus(); };
+      const amb = (f.querySelector('[name=nAmbito]:checked') || {}).value, pub = (f.querySelector('[name=nPublico]:checked') || {}).value;
+      const ec = f.querySelector('#nClasseErro');
+      if (!amb || !pub) { ec.textContent = !amb ? 'Escolha se o processo é interno ou externo.' : 'Escolha para quem é: membros, membros e servidores, ou servidores.'; ec.hidden = false; f.querySelector('#nClasse').scrollIntoView({ block: 'center' }); (f.querySelector(!amb ? '[name=nAmbito]' : '[name=nPublico]')).focus(); return; }
+      ec.hidden = true;
       if (!v('nTitulo')) return erro('nTitulo', 'Escreva o nome do curso ou evento.');
       const sei = A.seiNormal(v('nSei'));
       const igual = sei && A.seiChave(sei).length >= 11 && (A.semPlanilha() ? A.estado.processos : A.meus()).find(p => A.seiChave(p.sei) === A.seiChave(sei));
@@ -109,7 +127,7 @@
       }
       const p = A.novoProcesso({ titulo: v('nTitulo'), tipoId: tipo.id, sei, unidade: v('nUnidade'), entrada: v('nEntrada') || A.hojeIso(),
         inicio: ev ? v('nInicio') : '', fim: ev ? (v('nFim') || v('nInicio')) : '', limite: ev ? '' : v('nLimite'), horario: ev ? v('nHorario') : '',
-        modalidade: ev ? v('nModal') : '', local: ev ? v('nLocal') : '', apoio: v('nApoio') }, A.sessao.perfilId);
+        modalidade: ev ? v('nModal') : '', local: ev ? v('nLocal') : '', apoio: v('nApoio'), ambito: amb, publico: pub }, A.sessao.perfilId);
       p.naPlanilha = {};
       A.estado.processos.push(p);
       A.salvarJa();

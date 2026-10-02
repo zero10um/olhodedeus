@@ -269,6 +269,7 @@
       <dl class="ag-det-dados">
         <div>${svg(IC.hora, 18)}<dt>Quando</dt><dd>${quando}</dd><dd>${A.esc(p.horario || 'Horário não informado')}</dd></div>
         <div>${svg(IC.local, 18)}<dt>Onde</dt><dd>${A.esc(e.local || 'Local não informado')}${p.modalidade ? ` · ${A.esc(p.modalidade)}` : ''}</dd><dd><span class="ag-sala ${e.sala}">${svg(sala[0], 14)} ${sala[1]}</span></dd>${e.conflitos.length ? `<dd class="aviso-conflito">${A.ic('alerta')}<span><strong>Conflito de sala.</strong> ${e.conflitos.map(o => A.esc(A.textoConflito(o))).join(' ')}</span></dd>` : ''}</div>
+        <div>${svg(IC.pessoas, 18)}<dt>Classificação</dt><dd>${A.classeTexto(p) ? A.esc(A.classeTexto(p)) : 'Ainda não classificado'}</dd></div>
         ${p.unidade || p.apoio ? `<div>${svg(IC.pessoas, 18)}<dt>Unidade e apoio</dt><dd>${A.esc([p.unidade, p.apoio ? 'apoio ' + p.apoio : ''].filter(Boolean).join(' · '))}</dd></div>` : ''}
       </dl>
       <h3>Preparação <span class="secundario">${aplica.length ? `${prontos} de ${aplica.length} prontas` : 'nada a preparar'}</span></h3>
@@ -328,7 +329,7 @@
           ${evd.length ? evd.map(e => { const tot = A.entre(e.ini, e.fim) + 1; return `<article class="fi-ev" style="--pc:${e.quem.cor};--pbg:${e.quem.bg}">
             <p class="fi-hora"><span>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : 'Horário a definir'}</span></p>
             <h3>${A.esc(e.t)}</h3>
-            <p class="fi-onde">${A.esc(e.local || 'Local a definir')}</p>
+            <p class="fi-onde">${A.esc(e.local || 'Local a definir')}${A.classeTexto(e.p) ? ` · ${A.esc(A.classeTexto(e.p))}` : ''}</p>
             <p class="fi-pe"><span class="fi-ini">${A.esc(e.quem.ini)}</span>${tot > 1 ? `<span>dia ${A.entre(e.ini, d) + 1} de ${tot}</span>` : ''}<span class="fi-sala ${e.sala}">${marcaSala(e.sala)}</span></p>
             ${e.conflitos.length ? `<p class="fi-conf">Conflito de sala</p>` : ''}
           </article>`; }).join('') : '<p class="fi-vazio">Sem eventos</p>'}
@@ -342,8 +343,8 @@
     </section>
     ${daSemana.length ? `<section class="fi-folha fi-lista">
       <header class="fi-cab"><div><p class="fi-rot">Lista de horários</p><h1>${titulo}</h1></div></header>
-      <table><thead><tr><th>Dia</th><th>Horário</th><th>Evento</th><th>Local</th><th>Sala</th><th>Responsável</th><th>SEI</th></tr></thead>
-      <tbody>${dias.flatMap(d => daSemana.filter(e => ocorre(e, d)).sort(ordem).map(e => `<tr><td>${curta(d)}</td><td>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : '—'}</td><td>${A.esc(e.t)}</td><td>${A.esc(e.local || '—')}</td><td>${{ ok: 'reservada', falta: 'a reservar', na: '—' }[e.sala]}</td><td>${A.esc(e.quem.ini)}</td><td>${A.esc(e.p.sei || '—')}</td></tr>`)).join('')}</tbody></table>
+      <table><thead><tr><th>Dia</th><th>Horário</th><th>Evento</th><th>Classificação</th><th>Local</th><th>Sala</th><th>Responsável</th><th>SEI</th></tr></thead>
+      <tbody>${dias.flatMap(d => daSemana.filter(e => ocorre(e, d)).sort(ordem).map(e => `<tr><td>${curta(d)}</td><td>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : '—'}</td><td>${A.esc(e.t)}</td><td>${A.esc(A.classeTexto(e.p) || '—')}</td><td>${A.esc(e.local || '—')}</td><td>${{ ok: 'reservada', falta: 'a reservar', na: '—' }[e.sala]}</td><td>${A.esc(e.quem.ini)}</td><td>${A.esc(e.p.sei || '—')}</td></tr>`)).join('')}</tbody></table>
     </section>` : ''}`;
     document.querySelectorAll('#impressao').forEach(x => x.remove());
     document.body.appendChild(el);

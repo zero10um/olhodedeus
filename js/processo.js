@@ -148,7 +148,7 @@
   /* ---------- Topo ---------- */
   function desenharTopo() {
     const s = A.situacao(proc), el = vistaEl;
-    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}${!proc.arquivado && A.conflitosSala(proc).length ? `<span class="selo" style="--c:var(--critico);--cbg:var(--critico-bg)" title="${A.esc(A.conflitosSala(proc).map(A.textoConflito).join(' '))}">${A.ic('alerta')}Conflito de sala</span>` : ''}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
+    el.querySelector('#selos').innerHTML = `${proc.arquivado ? `<span class="selo carimbo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">${A.ic('arquivo-ic')}Arquivado${proc.situacaoPlanilha ? ': ' + A.esc(proc.situacaoPlanilha) : ''}</span>` : A.seloSit(s)}${!proc.arquivado && A.conflitosSala(proc).length ? `<span class="selo" style="--c:var(--critico);--cbg:var(--critico-bg)" title="${A.esc(A.conflitosSala(proc).map(A.textoConflito).join(' '))}">${A.ic('alerta')}Conflito de sala</span>` : ''}${A.classeTexto(proc) ? `<span class="etiqueta etiqueta-classe">${A.esc(A.classeTexto(proc))}</span>` : `<button type="button" class="selo" id="classificar" style="--c:var(--atencao);--cbg:var(--atencao-bg)" data-editar>${A.ic('alerta')}Classificar: interno ou externo?</button>`}<span class="etiqueta">${A.esc(proc.tipoNome || '')}</span>${proc.modalidade ? `<span class="etiqueta">${A.esc(proc.modalidade)}</span>` : ''}`;
     el.querySelector('#titulo').textContent = proc.titulo;
     el.querySelector('#trilhaTitulo').textContent = proc.titulo;
     document.title = `${proc.titulo} — Meus processos`;
@@ -169,12 +169,15 @@
       + (proc.observacoes ? `<div style="grid-column:1/-1"><dt>Observações</dt><dd style="font-weight:400">${A.esc(proc.observacoes)}</dd></div>` : '');
     A.ligarCopiaSei(el.querySelector('#meta'));
     el.querySelector('#btnEditarDados').onclick = () => { editandoDados = !editandoDados; desenharDados(); };
+    if (!el.dataset.classificar) el.dataset.classificar = '1', el.addEventListener('click', e => { if (e.target.closest('#classificar')) { editandoDados = true; desenharDados(); const c = vistaEl.querySelector('[name=ambito]'); if (c) { c.scrollIntoView({ block: 'center' }); c.focus(); } } });
     desenharDados();
   }
 
   /* ---------- Editar dados ---------- */
   const CAMPOS = () => [
     ['titulo', 'Nome do curso ou evento', 'text', 'largo'], ['sei', 'Número do processo SEI', 'text'],
+    ['ambito', 'Onde acontece', 'select', '', [['', '— escolha —'], ['interno', 'Interno: a escola promove'], ['externo', 'Externo: o servidor vai a evento de fora']]],
+    ['publico', 'Para quem', 'select', '', [['', '— escolha —'], ...Object.entries(A.PUBLICOS)]],
     ['tipoId', 'Tipo', 'select', '', A.regras(proc.dono).tipos.map(t => [t.id, t.nome])],
     ['unidade', 'Quem pediu (unidade)', 'text', 'largo'], ['entrada', 'Chegou ao setor em', 'date'],
     ['inicio', 'Início do evento', 'date'], ['fim', 'Fim do evento', 'date'], ['limite', 'Data limite (quando não há evento)', 'date'],
@@ -237,11 +240,12 @@
       const er = validar(v);
       if (er) { const c = f.elements[er[0]]; c.setAttribute('aria-invalid', 'true'); const m = c.parentElement.querySelector('.erro'); m.textContent = er[1]; m.hidden = false; c.focus(); return; }
       const antes = A.clonar(proc);
-      const mudouTipo = v.tipoId !== proc.tipoId;
+      const mudouTipo = v.tipoId !== proc.tipoId, mudouAmbito = v.ambito !== (proc.ambito || '');
       v.sei = A.seiGuardar(v.sei);
       if (A.lgpd()) v.apoio = A.iniciais(v.apoio);
       Object.assign(proc, v);
       if (mudouTipo) completarComTipo();
+      if (mudouTipo || mudouAmbito) A.aplicarAmbito(proc);
       A.anotar(proc, 'Sistema', 'Dados do processo alterados.');
       editandoDados = false;
       salvarE();

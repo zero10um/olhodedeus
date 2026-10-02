@@ -261,6 +261,33 @@
   }).filter(m => m.para && m.de !== m.para);
 
   /* ---------- Criar um processo a partir de um tipo ---------- */
+  /* ---------- Classificação: vem antes de tudo ----------
+     Interno: a escola promove (e emite os certificados).
+     Externo: o servidor vai a um evento de fora (e apresenta o certificado). */
+  A.AMBITOS = { interno: ['Interno', 'A escola promove e atende'], externo: ['Externo', 'O servidor vai a um evento de fora'] };
+  A.PUBLICOS = { membros: 'Membros', ambos: 'Membros e servidores', servidores: 'Servidores' };
+  A.classeTexto = p => [p.ambito && A.AMBITOS[p.ambito][0], p.publico && A.PUBLICOS[p.publico]].filter(Boolean).join(' · ');
+  const soNoExterno = f => ['local', 'comunicacao', 'contratacao'].includes(f.modeloId);
+  const certApresentado = n => /certificad/.test(n) && /apresent/.test(n);
+  const certEmitido = n => /certificad/.test(n) && /emit/.test(n);
+  /* Liga e desliga o que não se aplica conforme interno/externo; não mexe no que a pessoa marcou à mão */
+  A.aplicarAmbito = p => {
+    if (!p.ambito) return;
+    const ext = p.ambito === 'externo';
+    const marcar = (o, na) => {
+      if (na && !o.na) { o.na = true; o.naPor = 'ambito'; }
+      else if (!na && o.na && o.naPor === 'ambito') { o.na = false; delete o.naPor; }
+    };
+    p.frentes.forEach(f => {
+      if (soNoExterno(f)) marcar(f, ext);
+      f.itens.forEach(i => {
+        const n = A.semAcento(i.nome);
+        if (certApresentado(n)) marcar(i, !ext);
+        else if (certEmitido(n)) marcar(i, ext);
+      });
+    });
+  };
+
   A.novoProcesso = (dados, perfilId) => {
     const regras = A.regras(perfilId);
     const tipo = regras.tipos.find(t => t.id === dados.tipoId) || regras.tipos[0];
@@ -268,6 +295,7 @@
       id: 'p' + A.uid(), dono: perfilId, sei: A.seiGuardar(dados.sei), titulo: dados.titulo || 'Sem título', tipoId: tipo.id, tipoNome: tipo.nome,
       unidade: dados.unidade || '', entrada: dados.entrada || A.hojeIso(), inicio: dados.inicio || '', fim: dados.fim || dados.inicio || '',
       limite: dados.limite || '', horario: dados.horario || '', modalidade: dados.modalidade || '', local: dados.local || '', apoio: A.lgpd() ? A.iniciais(dados.apoio) : (dados.apoio || ''),
+      ambito: dados.ambito || '', publico: dados.publico || '',
       previsto: true, portao: [false, false, false], situacaoPlanilha: '', arquivado: false, observacoes: dados.observacoes || '',
       frentes: [], despachos: [], seis: [], diario: [], naPlanilha: {}, origem: dados.origem || 'manual',
       criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(),
@@ -276,6 +304,7 @@
       id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna || null, na: !!fm.naPadrao,
       itens: fm.passos.map(pm => ({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref }, estado: 'aberta', coluna: pm.coluna || null, na: false, editado: false })),
     }));
+    A.aplicarAmbito(proc);
     A.anotar(proc, 'Sistema', proc.origem === 'planilha' ? 'Processo trazido da planilha.' : 'Processo criado no sistema.');
     return proc;
   };

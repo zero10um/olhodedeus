@@ -23,7 +23,7 @@
       const pend = A.itensAtivos(p).filter(x => x.i.estado !== 'feita').map(x => ({ ...x, prazo: A.prazo(p, x.i) })).sort(porPrazo);
       const prox = pend[0];
       processos.push({
-        'Servidor': quem, 'Processo': p.titulo, 'SEI': p.sei || '', 'Tipo': p.tipoNome || '',
+        'Servidor': quem, 'Processo': p.titulo, 'SEI': p.sei || '', 'Interno/Externo': p.ambito ? A.AMBITOS[p.ambito][0] : '', 'Para quem': p.publico ? A.PUBLICOS[p.publico] : '', 'Tipo': p.tipoNome || '',
         'Início': p.inicio ? A.fmtAno(p.inicio) : '', 'Fim': p.fim && p.fim !== p.inicio ? A.fmtAno(p.fim) : '',
         'Horário': p.horario || '', 'Local': p.local || '', 'Fase atual': p.arquivado ? 'Arquivado' : faseAtual(p, pend),
         'Próximo passo': prox ? prox.i.nome : '', 'Prazo do próximo passo': prox && prox.prazo ? A.fmtAno(prox.prazo) : '',
