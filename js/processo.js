@@ -95,11 +95,11 @@
     const desp = A.despachoAberto(proc, i);
     const marco = i.quem === 'acompanha';
     const tags = `${marco ? `<span class="tag tag-marco">acompanhar${i.setor ? ' · ' + A.esc(i.setor) : ''}</span>` : ''}${i.obrig ? '<span class="tag tag-obrig">obrigatório</span>' : ''}`;
-    return `<li class="tarefa${i.estado === 'feita' ? ' feita' : ''}${marco ? ' marco' : ''}" data-i="${i.id}" style="view-transition-name:t-${i.id}">
+    return `<li class="tarefa${i.estado === 'feita' ? ' feita' : ''}${marco ? ' tarefa-marco' : ''}" data-i="${i.id}" style="view-transition-name:t-${i.id}">
       <input type="checkbox" id="cb-${i.id}" ${i.estado === 'feita' ? 'checked' : ''} ${bloqueada ? 'disabled' : ''} ${marco ? `aria-label="${A.esc(i.nome)}: já aconteceu?"` : ''}>
       <label class="o-que" for="cb-${i.id}">${A.esc(i.nome)}${tags ? ` <span class="tags">${tags}</span>` : ''}</label>
       <span class="prazo ${cls}" title="${A.esc(A.regraTexto(i.regra))}">${marco && i.estado !== 'feita' ? (p ? 'previsto até ' + A.fmt(p) : 'sem data') : quando(i)}</span>
-      ${bloqueada ? '' : `<div class="linha2">${i.estado === 'aberta' && !marco ? `<button type="button" class="btn-texto" data-despachar="${i.id}">${A.ic('enviar', 'ic-sm')}Despachei</button>` : ''}<button type="button" class="btn-texto" data-editar-passo="${i.id}" aria-expanded="${editandoPasso === i.id}">${A.ic('lapis', 'ic-sm')}Editar</button>${(i.coluna || f.coluna) && i.estado === 'aberta' ? `<span>Vai para a coluna "${i.coluna || f.coluna}"</span>` : ''}</div>`}
+      ${bloqueada ? '' : `<div class="linha2">${i.estado === 'aberta' && !marco ? `<button type="button" class="btn-texto" data-despachar="${i.id}">${A.ic('enviar', 'ic-sm')}Despachei</button>` : ''}<button type="button" class="btn-texto" data-editar-passo="${i.id}" aria-expanded="${editandoPasso === i.id}">${A.ic('lapis', 'ic-sm')}Editar</button>${(i.coluna || f.coluna) && i.estado === 'aberta' && !A.semPlanilha() ? `<span>Vai para a coluna "${i.coluna || f.coluna}"</span>` : ''}</div>`}
       ${desp ? `<div class="esperando-linha"><span>${A.ic('relogio', 'ic-sm')} Esperando <strong>${A.esc(desp.setor)}</strong> desde ${A.fmt(desp.enviado)} (${A.haDias(-A.dias(desp.enviado))})</span>${desp.texto ? `<span>${A.esc(desp.texto)}</span>` : ''}${pode() ? `<button type="button" class="btn-texto" data-resposta="${desp.id}">${A.ic('check', 'ic-sm')}Chegou resposta</button>` : ''}</div>` : ''}
       ${formDespacho === i.id ? formDespachoHTML(i) : ''}
       ${editandoPasso === i.id ? editorHTML(i) : ''}

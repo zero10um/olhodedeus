@@ -1250,9 +1250,9 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .tag-obrig { color: var(--critico); }
 .tag-marco { color: var(--tinta-2); border-style: dashed; }
 .tag-faz { color: var(--caneta); }
-.tarefa.marco .o-que { font-weight: 600; color: var(--tinta-2); }
-.tarefa.marco input[type=checkbox] { accent-color: var(--neutro); border-radius: 50%; }
-.tarefa.marco.feita .o-que { text-decoration: none; color: var(--ok); }
+.tarefa.tarefa-marco .o-que { font-weight: 600; color: var(--tinta-2); }
+.tarefa.tarefa-marco input[type=checkbox] { accent-color: var(--neutro); border-radius: 50%; }
+.tarefa.tarefa-marco.feita .o-que { text-decoration: none; color: var(--ok); }
 .tarefa.brilho { background: linear-gradient(var(--grifo-aqui), var(--grifo-aqui)) no-repeat; animation: grifar .55s cubic-bezier(.16, 1, .3, 1) both; }
 .agora { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--e-4); background: var(--folha); border: 1px solid var(--tinta); padding: var(--e-4) var(--e-5); margin-bottom: var(--e-4); }
 .agora-rot { font-size: 12.5px; font-weight: 700; font-stretch: 78%; text-transform: uppercase; letter-spacing: .08em; color: var(--tinta-2); margin-bottom: 6px; }
