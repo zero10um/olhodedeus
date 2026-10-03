@@ -119,7 +119,7 @@
   const naoSala = s => !s || /on-?line|teams|meet|zoom|remot|a definir/.test(s);
   A.salas = () => {
     const fixas = (A.estado.equipe && A.estado.equipe.salas && A.estado.equipe.salas.lista) || [];
-    const usadas = A.estado.processos.map(p => (p.local || '').trim()).filter(Boolean);
+    const usadas = A.estado.processos.filter(p => A.ehEventoDaEscola(p)).map(p => (p.local || '').trim()).filter(Boolean); // externos (outras cidades) não são salas da escola
     const vistas = new Map();
     [...fixas, ...usadas].forEach(s => { const k = A.normSala(s); if (!naoSala(k) && !vistas.has(k)) vistas.set(k, s); });
     return [...vistas.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -154,10 +154,10 @@
     if (!A.estado.regras[id]) A.estado.regras[id] = A.regrasPadrao();
     const r = A.estado.regras[id];
     // regras antigas ganham os modelos novos (sem mexer no que a pessoa já ajustou)
-    if ((r.versaoModelo || 1) < 2 && A.MODELOS_V2) {
+    if ((r.versaoModelo || 1) < 3 && A.MODELOS_V2) {
       const tem = new Set(r.tipos.map(t => t.id));
       r.tipos.unshift(...A.clonar(A.MODELOS_V2()).filter(t => !tem.has(t.id)));
-      r.versaoModelo = 2;
+      r.versaoModelo = 3;
     }
     return r;
   };
@@ -359,6 +359,8 @@
     if (pr.painel) pr.painel.modoFazer = v === 'simples' ? 'quadro' : 'cartoes';
     A.salvar();
   };
+  /* Evento da escola: o que a EMPRO organiza. Externo, custeio e certificação ficam fora da agenda da equipe. */
+  A.ehEventoDaEscola = p => { const t = A.tipo(p) || {}; return p.ambito !== 'externo' && t.ref === 'evento' && !['evento-externo', 'custeio-externo', 'certificacao'].includes(p.tipoId); };
   A.tudoFeito = p => { const it = A.itensAtivos(p); return it.length > 0 && it.every(x => x.i.estado === 'feita'); };
 
   A.novoProcesso = (dados, perfilId) => {

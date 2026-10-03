@@ -38,7 +38,8 @@
   /* Cada processo com data vira um evento da agenda */
   function eventos() {
     const hoje = A.hojeIso();
-    return A.estado.processos.filter(p => p.inicio).flatMap(p => {
+    // a agenda da equipe é dos eventos que a EMPRO faz; externos e certificações são controle pessoal
+    return A.estado.processos.filter(p => p.inicio && (st.todosTipos || A.ehEventoDaEscola(p))).flatMap(p => {
       const quem = A.perfil(p.dono) || { ini: '?', cor: 'var(--neutro)', bg: 'var(--neutro-bg)' };
       const frentes = p.frentes.map(f => {
         const e = A.estadoFrente(p, f);
@@ -66,7 +67,7 @@
   }
 
   /* ---------- Estado da tela ---------- */
-  const st = { nivel: null, ancora: A.hojeIso(), fds: false, quem: null, sel: null, visto: undefined };
+  const st = { nivel: null, ancora: A.hojeIso(), fds: false, quem: null, sel: null, visto: undefined, todosTipos: false, porSala: false };
   let cal, det, raiz, evs = [];
   const visiveis = () => evs.filter(e => !st.quem || st.quem.has(e.p.dono));
   const ocorre = (e, d) => d >= e.ini && d <= e.fim;
@@ -132,6 +133,8 @@
         </div>
         <label class="ag-marcar"><input type="checkbox" id="agFds"> Sábado e domingo</label>
         <div class="aquem"><span>Quem:</span><div class="ag-quem-lista" id="agQuem"></div><button class="btn-texto" id="agTodos" type="button">Todos</button><button class="btn-texto" id="agMeus" type="button">Só os meus</button></div>
+        <label class="ag-marcar"><input type="checkbox" id="agPorSala" ${st.porSala ? 'checked' : ''}> Ver por sala</label>
+        <label class="ag-marcar"><input type="checkbox" id="agTodosTipos" ${st.todosTipos ? 'checked' : ''}> Incluir externos e certificações</label>
         <button class="btn" id="agImprimir" type="button">${A.ic('arquivo-ic')} Imprimir a semana</button>
         <span class="ag-dica">Ctrl + rodinha do mouse também aproxima e afasta</span>
       </div>
@@ -164,7 +167,33 @@
       cal.innerHTML = `<div class="ag-vazio"><h2>Nenhum evento com data ainda</h2><p class="secundario">Quando alguém cadastrar um processo com data de início, ele aparece aqui para toda a equipe.</p><a class="btn btn-primario" href="#/processos/novo">${A.ic('mais')} Cadastrar um processo</a></div>`;
       return;
     }
-    if (st.nivel === 'dia' || st.nivel === 'semana') grade(dias); else mes(dias);
+    if (st.porSala) salas();
+    else if (st.nivel === 'dia' || st.nivel === 'semana') grade(dias); else mes(dias);
+  }
+
+  /* ---------- Por sala: as salas nas linhas, os dias da semana nas colunas ---------- */
+  function diasDaSemana() {
+    const seg = segunda(st.ancora);
+    let dias = Array.from({ length: 7 }, (_, k) => A.somar(seg, k));
+    if (!st.fds) dias = dias.filter(d => !fds(d) || visiveis().some(e => ocorre(e, d) && e.local));
+    return dias;
+  }
+  function linhasDeSala(dias) {
+    const lista = visiveis().filter(e => dias.some(d => ocorre(e, d)));
+    const nomes = A.salas();
+    lista.forEach(e => { if (e.local && !nomes.some(s => A.normSala(s) === A.normSala(e.local)) && !/on-?line|teams/i.test(e.local)) nomes.push(e.local); });
+    return nomes.map(s => ({ sala: s, porDia: dias.map(d => lista.filter(e => ocorre(e, d) && e.local && A.normSala(e.local) === A.normSala(s)).sort((a, b) => (a.h || '99') < (b.h || '99') ? -1 : 1)) }));
+  }
+  A.salasDaSemana = (dias) => linhasDeSala(dias);
+  function salas() {
+    const dias = diasDaSemana(), hoje = A.hojeIso(), linhas = linhasDeSala(dias);
+    raiz.querySelector('#agPeriodo').textContent = rotulo(dias.length ? dias : [st.ancora]);
+    if (!linhas.length) { cal.innerHTML = `<div class="ag-vazio"><h2>Nenhuma sala cadastrada</h2><p class="secundario">A administração cadastra as salas na tela Equipe. Os locais escritos nos processos também aparecem aqui.</p></div>`; return; }
+    cal.innerHTML = `<div class="ag-salas-rolagem"><table class="ag-salas" style="--cols:${dias.length}">
+      <thead><tr><th scope="col">Sala</th>${dias.map(d => `<th scope="col" class="${d === hoje ? 'hoje' : ''}">${SEM[dow(d)]} <strong>${A.d(d).getDate()}</strong></th>`).join('')}</tr></thead>
+      <tbody>${linhas.map(l => `<tr><th scope="row">${A.esc(l.sala)}</th>${l.porDia.map((evd, k) => `<td class="${dias[k] === hoje ? 'hoje' : ''}${evd.length ? ' ocupada' : ''}${evd.length > 1 ? ' conflito' : ''}">
+        ${evd.length ? evd.map(e => `<button type="button" class="ag-sala-ev" data-id="${e.id}" style="${cor(e)}"><span class="h">${e.h ? e.h + (e.aprox ? '' : '–' + e.hf) : 'dia todo'}</span><span class="t">${A.esc(e.t)}</span><span class="q">${A.esc(e.quem.ini)}</span></button>`).join('') : '<span class="livre">livre</span>'}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>`;
   }
 
   function grade(dias) {
@@ -346,7 +375,8 @@
       </footer>
     </section>
     ${daSemana.length ? `<section class="fi-folha fi-lista">
-      <header class="fi-cab"><div><p class="fi-rot">Lista de horários</p><h1>${titulo}</h1></div></header>
+      <header class="fi-cab"><div><p class="fi-rot">Salas e lista de horários</p><h1>${titulo}</h1></div></header>
+      ${(() => { const ls = linhasDeSala(dias).filter(l => l.porDia.some(x => x.length)); return ls.length ? `<table class="fi-salas"><thead><tr><th>Sala</th>${dias.map(d => `<th>${curta(d)}</th>`).join('')}</tr></thead><tbody>${ls.map(l => `<tr><th>${A.esc(l.sala)}</th>${l.porDia.map(evd => `<td>${evd.map(e => `<b>${e.h || 'dia todo'}</b> ${A.esc(e.t)}`).join('<br>') || '<span class="livre">livre</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''; })()}
       <table><thead><tr><th>Dia</th><th>Horário</th><th>Evento</th><th>Classificação</th><th>Local</th><th>Sala</th><th>Responsável</th><th>SEI</th></tr></thead>
       <tbody>${dias.flatMap(d => daSemana.filter(e => ocorre(e, d)).sort(ordem).map(e => `<tr><td>${curta(d)}</td><td>${e.h ? `${e.h}${e.aprox ? '' : '–' + e.hf}` : '—'}</td><td>${A.esc(e.t)}</td><td>${A.esc(A.classeTexto(e.p) || '—')}</td><td>${A.esc(e.local || '—')}</td><td>${{ ok: 'reservada', falta: 'a reservar', na: '—' }[e.sala]}</td><td>${A.esc(e.quem.ini)}</td><td>${A.esc(e.p.sei || '—')}</td></tr>`)).join('')}</tbody></table>
     </section>` : ''}`;
@@ -388,6 +418,8 @@
     $('#agTodos').onclick = () => { st.quem = null; desenhar(); };
     $('#agMeus').onclick = () => { st.quem = new Set([A.euId()]); desenhar(); };
     $('#agImprimir').onclick = imprimirSemana;
+    $('#agPorSala').onchange = e => mudar(() => { st.porSala = e.target.checked; desenhar(); }, 'in');
+    $('#agTodosTipos').onchange = e => { st.todosTipos = e.target.checked; evs = eventos(); desenhar(); };
     $('#agQuem').onclick = e => {
       const b = e.target.closest('[data-quem]'); if (!b) return;
       const q = b.dataset.quem, todos = A.estado.perfis.map(p => p.id);

@@ -71,6 +71,26 @@
       frente('pos', 'Pós-evento', 'pos', 'certificado', null, freqECertificados('e', 'escola')),
       frente('encerramento', 'Encerramento', 'fim', 'arquivo', null, [passo('e9', 'Arquivar o processo', 30, 'depois', 'fim')]),
     ] },
+    { id: 'custeio-externo', nome: 'Custeio de curso externo (pedido de outra unidade)', ref: 'evento', aprovacao: false, frentes: [
+      frente('instrucao', 'Pedido e análise', 'inicio', 'pasta', 'Instrução do processo', [
+        ob('u1', 'Conferir o pedido: DFD da unidade, proposta e programação do curso', 60, 'antes', 'inicio'),
+        ob('u2', 'Conferir o formulário de deslocamento (plano de viagem, fim de semana, bagagem)', 60, 'antes', 'inicio'),
+        ob('u3', 'Analisar a pertinência do tema e se não dá para fazer in company', 55, 'antes', 'inicio'),
+        passo('u4', 'Pedir à PGJ a alteração de escopo do Programa de Estudos (remanejamento)', 50, 'antes', 'inicio'),
+        ac('u5', 'Decisão da PGJ (escopo e deslocamento)', 45, 'antes', 'inicio', { setor: 'PGJ' }),
+        ob('u6', 'Encaminhar ao setor financeiro: inscrição, diárias e passagens', 40, 'antes', 'inicio'),
+      ]),
+      frente('deslocamento', 'Com o setor financeiro e a DA', 'prep', 'aviao', 'Deslocamento / Portaria', [
+        ac('u7', 'Portaria de diárias e passagens (DA)', 35, 'antes', 'inicio', { setor: 'DA' }),
+        ac('u8', 'Inscrição reservada e Nota de Empenho emitida', 30, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+        ac('u9', 'Passagens compradas', 15, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+      ]),
+      frente('pos', 'Certificado', 'pos', 'certificado', null, [
+        ob('u10', 'Avisar o servidor: o certificado será cobrado em 15 dias', 1, 'depois', 'fim'),
+        ob('u11', 'Cobrar o certificado do servidor', 15, 'depois', 'fim'),
+        ob('u12', 'Conferir o certificado apresentado', 20, 'depois', 'fim', { coluna: 'Certificados apresentados' }),
+      ]),
+    ] },
     { id: 'evento-externo', nome: 'Participação em evento externo', ref: 'evento', aprovacao: false, frentes: [
       frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
         ob('x1', 'Receber o pedido do servidor (evento, datas, local)', 45, 'antes', 'inicio'),
@@ -91,7 +111,7 @@
 
   A.MODELOS_V2 = MODELOS_V2;
   A.regrasPadrao = () => A.clonar({
-    versaoModelo: 2,
+    versaoModelo: 3,
     limites: { critico: 7, atencao: 15, vencendo: 3 },
     tipos: [
       ...MODELOS_V2(),

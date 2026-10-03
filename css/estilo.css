@@ -1304,3 +1304,26 @@ button.selo { border: 0; cursor: pointer; font: inherit; font-size: var(--t-xs);
 .lista-topo { display: flex; align-items: baseline; gap: var(--e-3); flex-wrap: wrap; margin-bottom: var(--e-3); border-bottom: 1px solid var(--linha); padding-bottom: var(--e-2); }
 .lista-topo .chave { margin-left: auto; }
 .faixa-estilo { display: flex; gap: var(--e-3); align-items: center; justify-content: center; flex-wrap: wrap; padding: 10px var(--e-4); font-size: var(--t-sm); background: var(--folha); border-bottom: 1px solid var(--tinta); }
+
+/* Agenda por sala */
+.ag-salas-rolagem { flex: 1; min-height: 0; overflow: auto; }
+.ag-salas { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 640px; }
+.ag-salas th, .ag-salas td { border-right: 1px solid var(--linha); border-bottom: 1px solid var(--linha); padding: 6px; vertical-align: top; text-align: left; }
+.ag-salas thead th { position: sticky; top: 0; background: var(--folha); z-index: 1; font-size: var(--t-sm); font-weight: 600; color: var(--tinta-2); border-bottom: 1.5px solid var(--tinta); }
+.ag-salas thead th strong { color: var(--tinta); font-size: var(--t-base); }
+.ag-salas thead th.hoje strong { background: var(--grifo-aqui); padding: 0 4px; mix-blend-mode: var(--mistura); }
+.ag-salas tbody th { width: 170px; font-weight: 750; font-size: var(--t-sm); background: var(--realce); }
+.ag-salas td.hoje { background: color-mix(in srgb, var(--caneta) 4%, transparent); }
+.ag-salas td.conflito { box-shadow: inset 0 0 0 2px var(--critico); }
+.ag-salas .livre { font-size: var(--t-xs); color: var(--tinta-3); }
+.ag-sala-ev { display: grid; width: 100%; text-align: left; border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); background: var(--pbg); color: var(--tinta); font: inherit; font-size: var(--t-xs); padding: 4px 6px; margin-bottom: 4px; cursor: pointer; border-radius: 2px; }
+.ag-sala-ev .h { font-weight: 800; }
+.ag-sala-ev .t { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-sala-ev .q { color: var(--tinta-2); }
+@media print {
+  .fi-salas { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 10px; table-layout: fixed; }
+  .fi-salas th, .fi-salas td { border: 1px solid #9AA4AC; padding: 4px 5px; vertical-align: top; text-align: left; }
+  .fi-salas thead th { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: #F3F5F6; }
+  .fi-salas tbody th { font-weight: 800; width: 28mm; }
+  .fi-salas .livre { color: #8A9198; }
+}

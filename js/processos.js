@@ -65,10 +65,10 @@
       <fieldset class="classifica" id="nQue">
         <legend>O que é este processo?</legend>
         <div class="tipo-cartoes">
-          ${[['capacitacao', 'A EMPRO promove, com docente ou empresa contratada'], ['acao-equipe', 'A própria equipe da EMPRO executa'], ['evento-externo', 'O servidor vai a um evento de fora'], ['certificacao', 'Só emitir certificado, sem evento para organizar']]
+          ${[['capacitacao', 'A EMPRO promove, com docente ou empresa contratada'], ['acao-equipe', 'A própria equipe da EMPRO executa'], ['evento-externo', 'O servidor vai a um evento de fora'], ['custeio-externo', 'Outra unidade pede para a EMPRO pagar um curso de fora'], ['certificacao', 'Só emitir certificado, sem evento para organizar']]
             .filter(([id]) => regras.tipos.some(t => t.id === id)).map(([id, d], k) => `<label class="opcao-ficha"><input type="radio" name="nTipoC" value="${id}" ${k === 0 ? 'checked' : ''}><span><strong>${A.esc(id === 'certificacao' ? 'Só emissão de certificado' : regras.tipos.find(t => t.id === id).nome)}</strong><small>${d}</small></span></label>`).join('')}
         </div>
-        <label class="tipo-outro">Outro tipo: <select id="nTipoOutro"><option value="">—</option>${regras.tipos.filter(t => !['capacitacao', 'acao-equipe', 'evento-externo', 'certificacao'].includes(t.id)).map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></label>
+        <label class="tipo-outro">Outro tipo: <select id="nTipoOutro"><option value="">—</option>${regras.tipos.filter(t => !['capacitacao', 'acao-equipe', 'evento-externo', 'custeio-externo', 'certificacao'].includes(t.id)).map(t => `<option value="${t.id}">${A.esc(t.nome)}</option>`).join('')}</select></label>
         <input type="hidden" id="nTipo" value="">
       </fieldset>
       <fieldset class="classifica" id="nClasse">
@@ -105,7 +105,7 @@
     </form>`;
     const f = el.querySelector('#fNovo');
     // o tipo escolhido decide o que aparece: externo e capacitação já sabem se são internos ou externos
-    const AMB_DO_TIPO = { 'evento-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' };
+    const AMB_DO_TIPO = { 'evento-externo': 'externo', 'custeio-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' };
     const mostrar = () => {
       const outro = f.querySelector('#nTipoOutro').value, card = f.querySelector('[name=nTipoC]:checked');
       const id = outro || (card ? card.value : regras.tipos[0].id), t = regras.tipos.find(x => x.id === id) || regras.tipos[0];
@@ -140,7 +140,7 @@
       const precisaAmb = !f.querySelector('#nAmbGrupo').hidden;
       if ((precisaAmb && !amb) || !pub) { ec.textContent = precisaAmb && !amb ? 'Escolha se o processo é interno ou externo.' : 'Escolha para quem é: membros, membros e servidores, ou servidores.'; ec.hidden = false; f.querySelector('#nClasse').scrollIntoView({ block: 'center' }); (f.querySelector(!amb ? '[name=nAmbito]' : '[name=nPublico]')).focus(); return; }
       ec.hidden = true;
-      const ambFinal = f.querySelector('#nAmbGrupo').hidden ? (({ 'evento-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' })[v('nTipo')] || '') : amb;
+      const ambFinal = f.querySelector('#nAmbGrupo').hidden ? (({ 'evento-externo': 'externo', 'custeio-externo': 'externo', capacitacao: 'interno', 'acao-equipe': 'interno' })[v('nTipo')] || '') : amb;
       if (!v('nTitulo')) return erro('nTitulo', 'Escreva o nome do curso ou evento.');
       const sei = A.seiNormal(v('nSei'));
       const igual = sei && A.seiChave(sei).length >= 11 && (A.semPlanilha() ? A.estado.processos : A.meus()).find(p => A.seiChave(p.sei) === A.seiChave(sei));

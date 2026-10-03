@@ -841,7 +841,9 @@
       return;
     }
     if (procAnterior !== id) {
-      abertas = new Set(proc.frentes.filter(f => !f.na && f.itens.some(i => !i.na && i.estado !== 'feita')).map(f => f.id));
+      // abre só o grupo da próxima tarefa sua, para não mostrar checklist demais de uma vez
+      const prox = proc.frentes.filter(f => !f.na && !A.travada(proc, f)).flatMap(f => f.itens.filter(i => !i.na && i.estado !== 'feita' && i.quem !== 'acompanha').map(i => ({ f, p: A.prazo(proc, i) || '9999' }))).sort((a, b) => a.p < b.p ? -1 : 1)[0];
+      abertas = new Set(prox ? [prox.f.id] : []);
       formDespacho = null; editandoPasso = null; formSei = false; editandoDados = false; ultimaFicha = null; procAnterior = id; faseVista = null;
     }
     vista.innerHTML = `<main>
