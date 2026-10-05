@@ -109,8 +109,61 @@
     ] },
   ];
 
+
+  /* Modelos da versão 4 (out/2026): só dois tipos de evento, com checklist fixo.
+     - semPrazo: itens do Início não têm prazo
+     - para: 'servidores' | 'membros' — o item só vale para esse público
+     - depAut: ao marcar com pedido à PGJ sem resposta (ou indeferido), o sistema pergunta antes
+     - sob: grupo que só entra quando a pessoa pede (botão no processo) */
+  const sp = (id, nome, extra) => Object.assign(passo(id, nome, 0, 'antes', 'inicio'), { semPrazo: true }, extra || {});
+  const MODELOS_V4 = () => [
+    { id: 'interno', nome: 'Evento interno', grupo: 'interno', ref: 'evento', aprovacao: false, frentes: [
+      frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
+        sp('i1', 'Verificar se está previsto no Programa de Estudos'),
+        sp('i2', 'Pedir autorização à PGJ (quando não estiver previsto)'),
+        sp('i3', 'Encaminhar à DOF (quando precisar de suplementação ou remanejamento)'),
+      ]),
+      Object.assign(frente('contratacao', 'Contratação (docente ou empresa)', 'prep', 'contrato', null, [
+        ob('i4', 'Pedir o DFD à unidade demandante', 65, 'antes', 'inicio', { depAut: true }),
+        ob('i5', 'Enviar a demanda ao setor financeiro da EMPRO', 60, 'antes', 'inicio', { depAut: true }),
+        ac('i6', 'DFD e TR prontos', 55, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)' }),
+        ac('i7', 'Nota de Empenho emitida', 20, 'antes', 'inicio', { setor: 'Setor financeiro (EMPRO)', obrig: true }),
+        ob('i8', 'Avisar o docente ou a empresa que está contratado', 15, 'antes', 'inicio'),
+      ]), { sob: true }),
+      apoioDasUnidades('i'), comunicacao('i'), deslocamento('i', true),
+      frente('pos', 'Pós-evento', 'pos', 'certificado', null, freqECertificados('i', 'escola')),
+      frente('encerramento', 'Encerramento', 'fim', 'arquivo', null, [passo('i9', 'Conferir se está tudo concluído e arquivar', 30, 'depois', 'fim')]),
+    ] },
+    { id: 'externo', nome: 'Evento externo', grupo: 'externo', ref: 'evento', aprovacao: false, frentes: [
+      frente('instrucao', 'Início', 'inicio', 'pasta', 'Instrução do processo', [
+        sp('x1', 'Receber o pedido (programação ou proposta e formulário de deslocamento)'),
+        sp('x2', 'Verificar se está previsto no Programa de Estudos'),
+        sp('x3', 'Pedir autorização à PGJ para participar'),
+        sp('x4', 'Pedir a portaria e as diárias à DA', { para: 'servidores', depAut: true }),
+        Object.assign(ac('x5', 'Portaria publicada pela PGJ', 0, 'antes', 'inicio', { setor: 'PGJ', para: 'membros' }), { semPrazo: true }),
+        sp('x6', 'Encaminhar ao setor financeiro (inscrição e passagens)'),
+        sp('x7', 'Encaminhar à DOF (só se precisar de suplementação ou remanejamento)'),
+      ]),
+      frente('pos', 'Certificado', 'pos', 'certificado', null, [
+        ob('x8', 'Avisar quem participou: o certificado será cobrado em 15 dias', 1, 'depois', 'fim'),
+        ob('x9', 'Cobrar o certificado', 15, 'depois', 'fim'),
+        ob('x10', 'Conferir o certificado apresentado', 20, 'depois', 'fim', { coluna: 'Certificados apresentados' }),
+      ]),
+    ] },
+  ];
+  /* Tipos antigos ficam guardados (os processos já cadastrados dependem deles), mas não aparecem no cadastro */
+  const ANTIGOS = { capacitacao: 'interno', 'acao-equipe': 'interno', curso: 'interno', 'evento-externo': 'externo', 'custeio-externo': 'externo' };
+  A.TIPOS_ANTIGOS = ANTIGOS;
+  A.atualizarModelos = r => {
+    if ((r.versaoModelo || 1) >= 4) return false;
+    const tem = new Set(r.tipos.map(t => t.id));
+    r.tipos.unshift(...A.clonar(MODELOS_V4()).filter(t => !tem.has(t.id)));
+    r.tipos.forEach(t => { if (ANTIGOS[t.id]) { t.oculto = true; t.grupo = ANTIGOS[t.id]; } });
+    r.versaoModelo = 4;
+    return true;
+  };
   A.MODELOS_V2 = MODELOS_V2;
-  A.regrasPadrao = () => A.clonar({
+  A.regrasPadrao = () => { const r = A.clonar({
     versaoModelo: 3,
     limites: { critico: 7, atencao: 15, vencendo: 3 },
     tipos: [
@@ -173,7 +226,7 @@
         frente('instrucao', 'Instrução do processo', 'inicio', 'pasta', 'Instrução do processo', [passo('o1', 'Instruir o processo', 7, 'antes', 'limite')]),
       ] },
     ],
-  });
+  }); A.atualizarModelos(r); return r; };
 
   /* Acha o tipo pelo nome que vem da planilha */
   A.tipoPorNome = (perfilId, nome) => {
@@ -185,26 +238,37 @@
   };
 
   /* Leva as regras novas para os processos em andamento: passos novos entram, prazos não editados à mão são atualizados */
+  /* Leva o modelo para os processos em andamento daquele tipo (na equipe: de todo mundo).
+     Passos novos entram; prazos e nomes não mexidos à mão se atualizam; passos que saíram do modelo
+     somem só se ainda estavam abertos e ninguém mexeu neles. Nada que foi feito é desmarcado. */
   A.aplicarRegras = (perfilId, tipoId) => {
     const tipo = A.regras(perfilId).tipos.find(t => t.id === tipoId);
-    let procs = 0, novos = 0, prazos = 0;
-    A.estado.processos.filter(p => p.dono === perfilId && p.tipoId === tipoId && !p.arquivado).forEach(proc => {
+    if (!tipo) return { procs: 0, novos: 0, prazos: 0, tirados: 0 };
+    let procs = 0, novos = 0, prazos = 0, tirados = 0;
+    const alvo = A.semPlanilha() ? A.estado.processos : A.estado.processos.filter(p => p.dono === perfilId);
+    alvo.filter(p => p.tipoId === tipoId && !p.arquivado).forEach(proc => {
       let mexeu = false;
       tipo.frentes.forEach(fm => {
         let f = proc.frentes.find(x => x.modeloId === fm.id);
-        if (!f) { f = { id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna, na: !!fm.naPadrao, itens: [] }; proc.frentes.push(f); mexeu = true; }
+        if (!f) {
+          if (fm.sob) return; // grupo que só entra quando pedem
+          f = { id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna, na: !!fm.naPadrao, itens: [] }; proc.frentes.push(f); mexeu = true;
+        }
         for (const pm of fm.passos) {
           const i = f.itens.find(x => x.modeloId === pm.id);
-          if (!i) { f.itens.push(A.itemDoModelo(pm)); novos++; mexeu = true; continue; }
-          i.quem = pm.quem || 'faz'; i.obrig = !!pm.obrig; if (pm.setor) i.setor = pm.setor;
-          if (!i.editado && (i.regra.dias !== +pm.dias || i.regra.quando !== pm.quando || i.regra.ref !== pm.ref || i.nome !== pm.nome)) {
-            i.regra = { dias: +pm.dias, quando: pm.quando, ref: pm.ref }; i.nome = pm.nome; prazos++; mexeu = true;
-          }
+          if (!i) { const novo = A.itemDoModelo(pm); A.ajustarPublico(proc, novo); f.itens.push(novo); novos++; mexeu = true; continue; }
+          i.quem = pm.quem || 'faz'; i.obrig = !!pm.obrig; i.depAut = !!pm.depAut; if (pm.setor) i.setor = pm.setor;
+          const regra = { dias: +pm.dias, quando: pm.quando, ref: pm.ref, ...(pm.semPrazo ? { semPrazo: true } : {}) };
+          if (!i.editado && (JSON.stringify(i.regra) !== JSON.stringify(regra) || i.nome !== pm.nome)) { i.regra = regra; i.nome = pm.nome; prazos++; mexeu = true; }
         }
+        const ids = new Set(fm.passos.map(p => p.id));
+        const antes = f.itens.length;
+        f.itens = f.itens.filter(i => !i.modeloId || ids.has(i.modeloId) || i.estado !== 'aberta' || i.editado || A.despachoAberto(proc, i));
+        if (f.itens.length !== antes) { tirados += antes - f.itens.length; mexeu = true; }
       });
-      if (mexeu) { procs++; A.anotar(proc, 'Sistema', 'Regras de prazo atualizadas.'); }
+      if (mexeu) { procs++; proc.atualizadoEm = new Date().toISOString(); A.anotar(proc, 'Sistema', 'Checklist atualizado pelas Regras de prazo.'); }
     });
-    return { procs, novos, prazos };
+    return { procs, novos, prazos, tirados };
   };
 
   /* ================= Tela: Regras de prazo ================= */
@@ -215,16 +279,18 @@
   /* A régua: todos os prazos do tipo em ordem, do mais cedo ao mais tarde, com o dia do evento no meio */
   function reguaHTML(tipo, dis) {
     const ev = tipo.ref === 'evento';
-    const linhas = tipo.frentes.flatMap((f, fi) => f.passos.map((p, pi) => ({ f, fi, p, pi, off: p.ref === 'entrada' ? -999 : (p.quando === 'antes' ? -1 : 1) * (+p.dias || 0) + (p.ref === 'fim' ? 0.5 : 0) })))
-      .sort((a, b) => a.off - b.off);
+    const todas = tipo.frentes.flatMap((f, fi) => f.passos.map((p, pi) => ({ f, fi, p, pi, off: p.ref === 'entrada' ? -999 : (p.quando === 'antes' ? -1 : 1) * (+p.dias || 0) + (p.ref === 'fim' ? 0.5 : 0) })));
+    const semPrazo = todas.filter(x => x.p.semPrazo), linhas = todas.filter(x => !x.p.semPrazo).sort((a, b) => a.off - b.off);
+    const tagsExtras = x => `${x.p.para ? `<span class="tag">só ${x.p.para}</span>` : ''}${x.p.depAut ? '<span class="tag">depende de autorização</span>' : ''}${x.f.sob ? '<span class="tag">só quando pedir</span>' : ''}`;
     const linha = x => `<li class="rg-l${x.p.quem === 'acompanha' ? ' acomp' : ''}${x.p.obrig ? ' obrig' : ''}">
         <span class="rg-d"><input class="cel numero" type="number" min="0" max="365" data-k="p:${x.fi}:${x.pi}:dias" value="${x.p.dias}" aria-label="Dias para ${A.esc(x.p.nome)}" ${dis}>
           <select class="cel" data-k="p:${x.fi}:${x.pi}:quando" aria-label="Antes ou depois" ${dis}><option value="antes" ${x.p.quando === 'antes' ? 'selected' : ''}>antes</option><option value="depois" ${x.p.quando === 'depois' ? 'selected' : ''}>depois</option></select></span>
         <span class="rg-n">${A.esc(x.p.nome)}<small>${A.esc(x.f.nome)}${x.p.ref === 'fim' ? ' · conta do fim' : x.p.ref === 'entrada' ? ' · conta da chegada ao setor' : ''}</small></span>
-        <span class="rg-tags">${x.p.quem === 'acompanha' ? `<span class="tag tag-marco">acompanhar${x.p.setor ? ' · ' + A.esc(x.p.setor) : ''}</span>` : '<span class="tag tag-faz">você faz</span>'}${x.p.obrig ? '<span class="tag tag-obrig">obrigatório</span>' : ''}</span></li>`;
+        <span class="rg-tags">${x.p.quem === 'acompanha' ? `<span class="tag tag-marco">acompanhar${x.p.setor ? ' · ' + A.esc(x.p.setor) : ''}</span>` : '<span class="tag tag-faz">você faz</span>'}${x.p.obrig ? '<span class="tag tag-obrig">obrigatório</span>' : ''}${tagsExtras(x)}</span></li>`;
     const antes = linhas.filter(x => x.off < 0), depois = linhas.filter(x => x.off >= 0);
     return `<section class="regua-prazos" aria-labelledby="rg-regua">
       <div class="rg-topo"><h2 id="rg-regua">Os prazos, em ordem</h2><p class="secundario">Mude os dias aqui mesmo: salva sozinho. Em azul o que você faz; em cinza o que você só acompanha.</p></div>
+      ${semPrazo.length ? `<p class="rg-sem"><strong>Sem prazo</strong> (checklist do Início)</p><ul class="rg-sem-lista">${semPrazo.map(x => `<li><span class="rg-n">${A.esc(x.p.nome)}<small>${A.esc(x.f.nome)}</small></span><span class="rg-tags">${x.p.quem === 'acompanha' ? '<span class="tag tag-marco">acompanhar</span>' : '<span class="tag tag-faz">você faz</span>'}${tagsExtras(x)}</span></li>`).join('')}</ul>` : ''}
       <ol class="rg-lista">${antes.map(linha).join('')}
         <li class="rg-dia" aria-label="${ev ? 'Dia do evento' : 'Data limite'}"><span>${ev ? 'Dia do evento' : 'Data limite'}</span></li>
         ${depois.map(linha).join('')}</ol>
@@ -232,19 +298,21 @@
   }
 
   A.telaRegras = vista => {
-    const reg = A.regras(), pode = A.podeEditar() && A.sessao.acesso === 'dono';
+    const equipe = A.semPlanilha();
+    const reg = A.regras(), pode = equipe ? !!(A.nuvem && A.nuvem.admin) : A.podeEditar() && A.sessao.acesso === 'dono';
     if (!tipoSel || !reg.tipos.find(t => t.id === tipoSel)) tipoSel = reg.tipos[0].id;
     const tipo = reg.tipos.find(t => t.id === tipoSel);
-    const usados = A.meus().filter(p => p.tipoId === tipo.id && !p.arquivado).length;
+    const usados = (A.semPlanilha() ? A.estado.processos : A.meus()).filter(p => p.tipoId === tipo.id && !p.arquivado).length;
     const dis = pode ? '' : 'disabled';
     const refsOp = tipo.ref === 'evento' ? [['inicio', 'início do evento'], ['fim', 'fim do evento'], ['entrada', 'entrada no setor']] : [['limite', 'data limite'], ['entrada', 'entrada no setor']];
     vista.innerHTML = `<main>
       <div class="cabeca"><div><h1>Regras de prazo</h1><p class="secundario" style="margin-top:6px;max-width:64ch">Para cada tipo de processo: quais frentes existem, que passos cada uma tem e quantos dias antes ou depois da data de referência cada passo vence. Quando um processo é criado ou vem da planilha, ele recebe estes passos.</p></div>
         <div class="salvo-barra" role="status">${A.ic('feito')}${ultima ? `Salvo. Última mudança: ${A.esc(ultima.desc)}. <button type="button" class="btn-texto" id="rgDesfazer">Desfazer</button>` : 'Tudo salvo sozinho.'}</div></div>
-      ${pode ? '' : `<p class="aviso-suave" style="margin-top:16px">${A.ic('olho')} Só a pessoa dona do painel muda as regras.</p>`}
+      ${pode ? '' : `<p class="aviso-suave" style="margin-top:16px">${A.ic('olho')} ${equipe ? 'Os tipos e as regras valem para toda a equipe. Só a administração muda; no seu processo você pode acrescentar ou tirar itens.' : 'Só a pessoa dona do painel muda as regras.'}</p>`}
       <div class="regras-layout">
         <nav aria-label="Tipos de processo"><ul class="tipos-lista">
-          ${reg.tipos.map(t => `<li><button type="button" data-tipo="${t.id}" ${t.id === tipoSel ? 'aria-current="true"' : ''}><span class="t">${A.esc(t.nome)}</span><span class="d">${(n => `${n} passo${n === 1 ? '' : 's'}`)(t.frentes.reduce((n, f) => n + f.passos.length, 0))} · ${t.ref === 'evento' ? 'conta do evento' : 'conta da data limite'}</span></button></li>`).join('')}
+          ${reg.tipos.filter(t => !t.oculto).map(t => `<li><button type="button" data-tipo="${t.id}" ${t.id === tipoSel ? 'aria-current="true"' : ''}><span class="t">${A.esc(t.nome)}</span><span class="d">${(n => `${n} passo${n === 1 ? '' : 's'}`)(t.frentes.reduce((n, f) => n + f.passos.length, 0))} · ${t.ref === 'evento' ? 'conta do evento' : 'conta da data limite'}</span></button></li>`).join('')}
+          ${reg.tipos.some(t => t.oculto) ? `<li class="antigos"><details ${reg.tipos.find(t => t.id === tipoSel && t.oculto) ? 'open' : ''}><summary>Tipos antigos <small>(só para processos já cadastrados)</small></summary><ul>${reg.tipos.filter(t => t.oculto).map(t => `<li><button type="button" data-tipo="${t.id}" ${t.id === tipoSel ? 'aria-current="true"' : ''}><span class="t">${A.esc(t.nome)}</span><span class="d">${t.grupo === 'externo' ? 'aparece como Evento externo' : 'aparece como Evento interno'}</span></button></li>`).join('')}</ul></details></li>` : ''}
           ${pode ? `<li class="novo"><button type="button" id="rgNovoTipo"><span class="t" style="color:var(--caneta)">${A.ic('mais', 'ic-sm')} Novo tipo</span></button></li>` : ''}
         </ul></nav>
         <div id="rgCorpo">
@@ -269,6 +337,7 @@
                 <label>Coluna da planilha <select data-k="f:${fi}:coluna" ${dis}><option value="">Nenhuma (só no meu controle)</option>${A.COLUNAS.map(col => `<option ${f.coluna === col ? 'selected' : ''}>${col}</option>`).join('')}</select></label>
                 <label>Ícone <select data-k="f:${fi}:icone" ${dis}>${Object.entries(ICONES_OP).map(([k, n]) => `<option value="${k}" ${f.icone === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
                 <label class="chave"><input type="checkbox" data-k="f:${fi}:naPadrao" ${f.naPadrao ? 'checked' : ''} ${dis}> Começa como "não se aplica"</label>
+                <label class="chave"><input type="checkbox" data-k="f:${fi}:sob" ${f.sob ? 'checked' : ''} ${dis}> Só entra quando pedir (botão no processo)</label>
               </div>
               <div class="passo-regra cabec" aria-hidden="true"><span>Passo</span><span>Dias</span><span>Antes ou depois</span><span>De quê</span><span>Quem</span><span></span></div>
               ${f.passos.map((p, pi) => `<div class="passo-regra">
@@ -277,7 +346,10 @@
                 <select class="cel" data-k="p:${fi}:${pi}:quando" aria-label="Antes ou depois" ${dis}><option value="antes" ${p.quando === 'antes' ? 'selected' : ''}>antes</option><option value="depois" ${p.quando === 'depois' ? 'selected' : ''}>depois</option></select>
                 <select class="cel col-ref" data-k="p:${fi}:${pi}:ref" aria-label="A partir de" ${dis}>${refsOp.map(([v, n]) => `<option value="${v}" ${p.ref === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
                 <span class="rg-quem"><select class="cel" data-k="p:${fi}:${pi}:quem" aria-label="Quem faz ${A.esc(p.nome)}" ${dis}><option value="faz" ${p.quem !== 'acompanha' ? 'selected' : ''}>você faz</option><option value="acompanha" ${p.quem === 'acompanha' ? 'selected' : ''}>acompanha</option></select>
-                  <label class="chave"><input type="checkbox" data-k="p:${fi}:${pi}:obrig" ${p.obrig ? 'checked' : ''} ${dis}> obrigatório</label></span>
+                  <label class="chave"><input type="checkbox" data-k="p:${fi}:${pi}:obrig" ${p.obrig ? 'checked' : ''} ${dis}> obrigatório</label>
+                  <label class="chave"><input type="checkbox" data-k="p:${fi}:${pi}:semPrazo" ${p.semPrazo ? 'checked' : ''} ${dis}> sem prazo</label>
+                  <label class="chave"><input type="checkbox" data-k="p:${fi}:${pi}:depAut" ${p.depAut ? 'checked' : ''} ${dis}> depende de autorização</label>
+                  <select class="cel" data-k="p:${fi}:${pi}:para" aria-label="Para quem vale ${A.esc(p.nome)}" ${dis}><option value="" ${!p.para ? 'selected' : ''}>todos</option><option value="servidores" ${p.para === 'servidores' ? 'selected' : ''}>só servidores</option><option value="membros" ${p.para === 'membros' ? 'selected' : ''}>só membros</option></select></span>
                 ${pode ? `<button type="button" class="btn-icone" data-tirar-p="${fi}:${pi}" aria-label="Tirar o passo ${A.esc(p.nome)}">${A.ic('lixo')}</button>` : '<span></span>'}
               </div>`).join('')}
               ${pode ? `<button type="button" class="btn-texto" data-novo-p="${fi}" style="margin-top:6px">${A.ic('mais', 'ic-sm')}Adicionar passo</button>` : ''}
@@ -287,9 +359,12 @@
           </details>
 
           <section class="bloco" style="margin-top:24px" aria-labelledby="rg-aplicar">
-            <h2 id="rg-aplicar" style="font-size:18px">Levar para os processos em andamento</h2>
-            <p class="secundario" style="margin:6px 0 12px;max-width:64ch">Processos novos já recebem estas regras. Os ${usados} processo${usados === 1 ? '' : 's'} de ${A.esc(tipo.nome)} em andamento só mudam se você pedir: passos novos entram e os prazos que você não mudou à mão são atualizados. Nada que já foi feito é desmarcado.</p>
+            <h2 id="rg-aplicar" style="font-size:18px">Processos em andamento</h2>
+            <p class="secundario" style="margin:6px 0 12px;max-width:64ch">Toda mudança aqui vai sozinha para os ${usados} processo${usados === 1 ? '' : 's'} de ${A.esc(tipo.nome)} em andamento${equipe ? ', de toda a equipe' : ''}: itens novos entram, prazos não mexidos à mão se atualizam e itens tirados somem só se ainda estavam abertos. Nada que foi feito é desmarcado.</p>
+            <div hidden>
+            <p hidden>Processos novos já recebem estas regras. Os ${usados} processo${usados === 1 ? '' : 's'} de ${A.esc(tipo.nome)} em andamento só mudam se você pedir: passos novos entram e os prazos que você não mudou à mão são atualizados. Nada que já foi feito é desmarcado.</p>
             <div class="form-botoes"><button type="button" class="btn btn-primario" id="rgAplicar" ${pode && usados ? '' : 'disabled'}>${A.ic('atualizar')}Atualizar ${usados} processo${usados === 1 ? '' : 's'}</button>
+            </div>
             ${pode ? `<button type="button" class="btn" id="rgPadrao">${A.ic('desfazer')}Voltar este tipo ao modelo inicial</button>${tipo.id.startsWith('t') ? `<button type="button" class="btn-texto btn-perigo" id="rgTirarTipo">${A.ic('lixo', 'ic-sm')}Tirar este tipo</button>` : ''}` : ''}</div>
           </section>
 
@@ -310,7 +385,12 @@
     const ed = corpo.querySelector('.rg-editar'); if (ed) ed.ontoggle = () => { A.prefs().rgEditarAberto = ed.open; A.salvar(); };
     vista.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { tipoSel = b.dataset.tipo; ultima = null; A.mudar(A.redesenhar); });
     if (!pode) return;
-    const mudou = (desc, desfazer) => { ultima = { desc, desfazer }; A.salvar(); A.comFoco(A.redesenhar); };
+    let tLevar;
+    const levar = () => { clearTimeout(tLevar); tLevar = setTimeout(() => {
+      const r = A.aplicarRegras(A.sessao.perfilId, tipo.id);
+      if (r.procs) { A.salvar(); A.avisar(`${r.procs} processo${r.procs > 1 ? 's' : ''} em andamento atualizado${r.procs > 1 ? 's' : ''}.`); }
+    }, 1200); };
+    const mudou = (desc, desfazer) => { ultima = { desc, desfazer }; A.salvar(); levar(); A.comFoco(A.redesenhar); };
     corpo.onchange = e => {
       const k = e.target.dataset.k; if (!k) return;
       const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -340,6 +420,7 @@
         if (campo === 'nome' && !String(v).trim()) { e.target.value = antes; return A.avisar('O passo precisa de um nome.'); }
         if (campo === 'dias') { novo = parseInt(v, 10); if (isNaN(novo) || novo < 0) { e.target.value = antes; return A.avisar('Use um número de dias, de 0 para cima.'); } }
         if (campo === 'coluna') novo = v || null;
+        if (campo === 'para') novo = v || undefined;
         p[campo] = campo === 'nome' ? String(novo).trim() : novo;
         return mudou(`passo "${p.nome}": ${A.regraTexto(p)}`, () => { p[campo] = antes; });
       }

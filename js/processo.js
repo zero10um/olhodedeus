@@ -9,7 +9,7 @@
   const ESTADOS = [['aberta', 'A fazer'], ['esperando', 'Esperando resposta'], ['feita', 'Feito']];
   const TIPOS_SEI = ['Apoio das unidades', 'Formulário de deslocamento', 'Deslocamento', 'Portaria', 'DFD', 'TR', 'Contratação', 'Coffee break', 'Comarcas', 'Apoio', 'Pagamento', 'Certificados', 'Outro'];
   const tipoSeiDe = nome => { const n = A.semAcento(nome); return /apoio das unidades|sei de apoio/.test(n) ? 'Apoio das unidades' : /formulario de deslocamento/.test(n) ? 'Formulário de deslocamento' : /coffee/.test(n) ? 'Coffee break' : /comarca/.test(n) ? 'Comarcas' : /dfd/.test(n) ? 'DFD' : /\btr\b/.test(n) ? 'TR' : /contrat/.test(n) ? 'Contratação' : /diaria|passag|desloc/.test(n) ? 'Deslocamento' : /portaria/.test(n) ? 'Portaria' : /certific/.test(n) ? 'Certificados' : /pagam|empenh/.test(n) ? 'Pagamento' : 'Outro'; };
-  const SUB_FASE = { inicio: 'Ver se estava previsto, abrir o processo e dar o primeiro despacho.', prep: 'Depois de aprovado, cada frente anda ao mesmo tempo, com seu próprio despacho.', evento: '', pos: 'Depois do evento: certificados, exonerados e pagamentos.', fim: 'Os últimos lançamentos antes de fechar o processo.' };
+  const SUB_FASE = { inicio: 'Checklist do início: plano, autorizações e encaminhamentos. Nada aqui trava o resto do processo.', prep: 'Depois de aprovado, cada frente anda ao mesmo tempo, com seu próprio despacho.', evento: '', pos: 'Depois do evento: certificados, exonerados e pagamentos.', fim: 'Os últimos lançamentos antes de fechar o processo.' };
 
   let proc = null, vistaEl = null;
   let abertas = new Set(), formDespacho = null, editandoPasso = null, formSei = false, editandoDados = false, ultimaFicha = null, linhaBrilho = null, procAnterior = null;
@@ -25,7 +25,7 @@
   const salvarE = fn => { A.salvar(); return A.mudar(fn || desenhar); };
   function quando(i) {
     if (i.estado === 'feita') return 'feito';
-    const p = prazo(i); if (!p) return 'sem data';
+    const p = prazo(i); if (!p) return i.regra && i.regra.semPrazo ? '' : 'sem data';
     if (i.estado === 'esperando') return `prazo ${A.fmt(p)}`;
     const n = A.dias(p);
     if (n < -1) return `atrasada há ${-n} dias`;
@@ -36,9 +36,9 @@
   }
   const fasesVisiveis = () => A.FASES.filter(fa => fa.id === 'evento' ? !!proc.inicio : proc.frentes.some(f => f.fase === fa.id));
   function faseAtual() {
-    if (!A.aprovado(proc)) return 'inicio';
-    // processo novo com início guiado: começa pelo início até ele ser resolvido
-    if (A.guiaAplica(proc) && !A.guiaConcluido(proc) && ((proc.guia && proc.guia.plano) || !proc.frentes.some(f => f.fase !== 'inicio' && f.itens.some(i => i.estado === 'feita')))) return 'inicio';
+    // enquanto o checklist do Início tiver item aberto e nada da Preparação andou, a tela abre no Início
+    const iniAberto = proc.frentes.some(f => f.fase === 'inicio' && !f.na && f.itens.some(i => !i.na && i.estado !== 'feita'));
+    if (iniAberto && !proc.frentes.some(f => f.fase !== 'inicio' && f.itens.some(i => i.estado === 'feita'))) return 'inicio';
     const fs = fasesVisiveis().map(f => f.id);
     if (proc.inicio) {
       if (A.dias(proc.inicio) > 0) return fs.includes('prep') ? 'prep' : 'inicio';
@@ -50,6 +50,7 @@
 
   /* ---------- Ações ---------- */
   function marcar(f, i, feita) {
+    if (feita && i.depAut && A.semAutorizacao(proc) && !confirm(`Ainda não há autorização da PGJ registrada neste processo.\n\nMarcar "${i.nome}" como feito mesmo assim?`)) { desenharConteudo(); return; }
     if (feita && /^abrir o sei/.test(A.semAcento(i.nome))) {
       const n = prompt(`Qual o número do SEI? (opcional)\n\n${i.nome}`);
       if (n && n.trim()) proc.seis.push({ id: 's' + A.uid(), tipo: tipoSeiDe(i.nome), numero: A.seiGuardar(n.trim()), desc: i.nome, f: f.id });
@@ -206,7 +207,7 @@
     ['titulo', 'Nome do curso ou evento', 'text', 'largo'], ['sei', 'Número do processo SEI', 'text'],
     ['ambito', 'Onde acontece', 'select', '', [['', '— escolha —'], ['interno', 'Interno: a escola promove'], ['externo', 'Externo: o servidor vai a evento de fora']]],
     ['publico', 'Para quem', 'select', '', [['', '— escolha —'], ...Object.entries(A.PUBLICOS)]],
-    ['tipoId', 'Tipo', 'select', '', A.regras(proc.dono).tipos.map(t => [t.id, t.nome])],
+    ['tipoId', 'Tipo', 'select', '', A.regras(proc.dono).tipos.filter(t => !t.oculto || t.id === proc.tipoId).map(t => [t.id, t.nome + (t.oculto ? ' (antigo)' : '')])],
     ['unidade', 'Quem pediu (unidade)', 'text', 'largo'], ['entrada', 'Chegou ao setor em', 'date'],
     ['inicio', 'Início do evento', 'date'], ['fim', 'Fim do evento', 'date'], ['limite', 'Data limite (quando não há evento)', 'date'],
     ['horario', 'Horário', 'text'], ['modalidade', 'Modalidade', 'select', '', [['', '—'], ['Presencial', 'Presencial'], ['Online', 'Online'], ['Híbrido', 'Híbrido']]],
@@ -263,12 +264,14 @@
       const er = validar(v);
       if (er) { const c = f.elements[er[0]]; c.setAttribute('aria-invalid', 'true'); const m = c.parentElement.querySelector('.erro'); m.textContent = er[1]; m.hidden = false; c.focus(); return; }
       const antes = A.clonar(proc);
-      const mudouTipo = v.tipoId !== proc.tipoId, mudouAmbito = v.ambito !== (proc.ambito || '');
+      const mudouTipo = v.tipoId !== proc.tipoId, mudouAmbito = v.ambito !== (proc.ambito || ''), dataAntes = [proc.inicio, proc.fim], pubAntes = proc.publico;
       v.sei = A.seiGuardar(v.sei);
       if (A.lgpd()) v.apoio = A.iniciais(v.apoio);
       Object.assign(proc, v);
       if (mudouTipo) completarComTipo();
       if (mudouTipo || mudouAmbito) A.aplicarAmbito(proc);
+      if (pubAntes !== proc.publico) A.aplicarPublico(proc);
+      if (dataAntes[0] !== proc.inicio || dataAntes[1] !== proc.fim) A.anotar(proc, 'Sistema', `Data do evento mudou de ${dataAntes[0] ? A.fmt(dataAntes[0]) + (dataAntes[1] && dataAntes[1] !== dataAntes[0] ? ' a ' + A.fmt(dataAntes[1]) : '') : 'sem data'} para ${proc.inicio ? A.fmt(proc.inicio) + (proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : '') : 'sem data'}. Prazos recalculados.`);
       A.anotar(proc, 'Sistema', 'Dados do processo alterados.');
       editandoDados = false;
       salvarE();
@@ -286,7 +289,6 @@
       let feitas = 0, total = 0;
       if (fa.id === 'evento') { total = 1; feitas = A.dias(proc.fim || proc.inicio) < 0 ? 1 : 0; }
       else proc.frentes.filter(f => f.fase === fa.id && !f.na).forEach(f => f.itens.filter(x => !x.na).forEach(t => { total++; if (t.estado === 'feita') feitas++; }));
-      if (fa.id === 'inicio' && proc.previsto === false) { total += 3; feitas += (proc.portao || []).filter(Boolean).length; }
       const pronta = total && feitas === total, cls = (fa.id === atual ? 'atual' : pronta ? 'pronta' : '') + (umaPorVez() && fa.id === faseNaTela() ? ' vendo' : '');
       const d = fa.id === 'evento' ? `${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}` : fa.d;
       const cont = fa.id === 'evento' ? (A.dias(proc.inicio) > 0 ? `em ${A.dias(proc.inicio)} dias` : A.dias(proc.fim || proc.inicio) >= 0 ? 'acontecendo' : 'aconteceu') : `${feitas} de ${total}`;
@@ -342,6 +344,81 @@
     </section>`;
     ligarFases(el);
     el.querySelector('#verFeitos').onchange = e => { A.prefs().listaFeitos = e.target.checked; A.salvar(); desenharConteudo(); };
+  }
+
+
+  /* ---------- Encaminhamentos do Início: um despacho, vários destinos, cada um com sua resposta ---------- */
+  const DESTINOS = ['PGJ', 'DOF', 'DA', 'Setor financeiro (EMPRO)', 'GCI'];
+  let formEnc = false, respondendo = null;
+  function encaminhamentosHTML() {
+    const ds = proc.despachos.filter(d => d.grupo || /pgj|dof|\bda\b|financeiro/i.test(d.setor || ''));
+    const grupos = [];
+    ds.forEach(d => { const k = d.grupo || d.id; let g = grupos.find(x => x.k === k); if (!g) grupos.push(g = { k, data: d.enviado, texto: d.texto, itens: [] }); g.itens.push(d); });
+    grupos.sort((a, b) => (b.data || '') < (a.data || '') ? -1 : 1);
+    const linha = d => {
+      const situ = !d.resposta ? `<span class="enc-situ aguardando">${A.ic('relogio', 'ic-sm')} aguardando resposta${d.enviado ? ` · ${A.haDias(-A.dias(d.enviado))}` : ''}</span>`
+        : `<span class="enc-situ ${d.resultado || 'respondido'}">${A.ic(d.resultado === 'indeferido' ? 'alerta' : 'check', 'ic-sm')} ${d.resultado ? A.RESULTADOS[d.resultado] : 'respondeu'} em ${A.fmt(d.resposta)}</span>${d.nota ? `<span class="secundario"> · ${A.esc(d.nota)}</span>` : ''}`;
+      return `<li class="enc-dest"><strong>→ ${A.esc(d.setor)}</strong>${situ}
+        ${!d.resposta && pode() ? (respondendo === d.id
+          ? `<div class="enc-resp" data-resp-form="${d.id}"><span>Resposta de ${A.esc(d.setor)}:</span>${Object.entries(A.RESULTADOS).map(([k, n]) => `<button type="button" class="btn" data-resultado="${k}">${n}</button>`).join('')}
+             <label>em <input type="date" name="respData" value="${A.hojeIso()}" max="${A.hojeIso()}"></label><input name="respNota" placeholder="observação (opcional)"><button type="button" class="btn-texto" data-resp-cancelar>Cancelar</button></div>`
+          : `<button type="button" class="btn-texto" data-responder="${d.id}">Registrar resposta</button>`) : ''}</li>`;
+    };
+    return `<section class="encaminhamentos" aria-labelledby="t-enc">
+      <div class="enc-topo"><h3 id="t-enc">Encaminhamentos</h3>${pode() && !formEnc ? `<button type="button" class="btn" id="encNovo">${A.ic('enviar')} Registrar encaminhamento</button>` : ''}</div>
+      ${formEnc ? `<form class="form-mini" id="encForm" novalidate>
+        <span class="titulo">Para quem foi o despacho? Pode marcar mais de um.</span>
+        <div class="enc-destinos">${DESTINOS.map(s => `<label class="opcao"><input type="checkbox" name="dest" value="${s}"> ${s}</label>`).join('')}
+          <label class="opcao">Outro: <input name="destOutro" list="lista-setores" placeholder="unidade" style="max-width:180px"></label></div>
+        <div class="dois"><div class="campo"><label for="encData">Enviado em</label><input id="encData" name="data" type="date" value="${A.hojeIso()}" max="${A.hojeIso()}"></div>
+          <div class="campo"><label for="encTexto">O que foi pedido <small>(opcional)</small></label><input id="encTexto" name="texto" placeholder="ex.: autorização e análise de remanejamento"></div></div>
+        <p class="erro" id="encErro" hidden>Marque pelo menos um destino.</p>
+        <div class="form-botoes"><button class="btn btn-primario" type="submit">Salvar: fica aguardando resposta</button><button class="btn" type="button" id="encCancelar">Cancelar</button></div>
+      </form>` : ''}
+      ${grupos.length ? `<ul class="enc-lista">${grupos.map(g => `<li class="enc-grupo"><p class="enc-data">Despacho de ${g.data ? A.fmt(g.data) : '—'}${g.texto ? ` · ${A.esc(g.texto)}` : ''}</p><ul>${g.itens.map(linha).join('')}</ul></li>`).join('')}</ul>`
+        : (formEnc ? '' : '<p class="secundario">Nenhum encaminhamento ainda. Ao despachar à PGJ, à DOF ou a outra unidade, registre aqui: o pedido fica "aguardando" até a resposta chegar.</p>')}
+    </section>`;
+  }
+  function ligarEncaminhamentos(el) {
+    const n = el.querySelector('#encNovo'); if (n) n.onclick = () => { formEnc = true; desenharConteudo(); const c = vistaEl.querySelector('#encForm input'); if (c) c.focus(); };
+    const f = el.querySelector('#encForm');
+    if (f) {
+      f.querySelector('#encCancelar').onclick = () => { formEnc = false; desenharConteudo(); };
+      f.onsubmit = e => {
+        e.preventDefault();
+        const dest = [...f.querySelectorAll('[name=dest]:checked')].map(x => x.value);
+        const outro = f.elements.destOutro.value.trim(); if (outro) dest.push(outro);
+        if (!dest.length) { f.querySelector('#encErro').hidden = false; return; }
+        const criados = A.registrarEncaminhamento(proc, dest, f.elements.data.value || A.hojeIso(), f.elements.texto.value.trim());
+        formEnc = false; salvarE();
+        A.avisar(`Encaminhamento salvo: aguardando ${dest.join(' e ')}.`, () => { proc.despachos = proc.despachos.filter(d => !criados.includes(d)); criados.forEach(d => { const it = d.itemId && A.acharItem(proc, d.itemId); if (it && it.i.estado === 'esperando') it.i.estado = 'aberta'; }); proc.diario.pop(); salvarE(); });
+      };
+    }
+    el.querySelectorAll('[data-responder]').forEach(b => b.onclick = () => { respondendo = b.dataset.responder; desenharConteudo(); });
+    el.querySelectorAll('[data-resp-cancelar]').forEach(b => b.onclick = () => { respondendo = null; desenharConteudo(); });
+    el.querySelectorAll('[data-resp-form]').forEach(box => box.querySelectorAll('[data-resultado]').forEach(b => b.onclick = () => {
+      const d = proc.despachos.find(x => x.id === box.dataset.respForm); if (!d) return;
+      A.responderDespacho(proc, d, b.dataset.resultado, box.querySelector('[name=respData]').value || A.hojeIso(), box.querySelector('[name=respNota]').value.trim());
+      respondendo = null; salvarE();
+      A.avisar(b.dataset.resultado === 'indeferido' ? 'Negativa registrada. Entrou a pendência "Decidir o que fazer".' : 'Resposta registrada.');
+    }));
+  }
+  /* Grupos que só entram quando a pessoa pede (ex.: contratação no evento interno) */
+  function gruposSobHTML(fa) {
+    const t = A.tipo(proc); if (!t || !pode()) return '';
+    const faltam = t.frentes.filter(fm => fm.sob && fm.fase === fa.id && !proc.frentes.some(f => f.modeloId === fm.id));
+    return faltam.map(fm => `<button type="button" class="sugestao sob" data-sob="${fm.id}">${A.ic('mais', 'ic-sm')}Acrescentar os itens de ${A.esc(fm.nome.split(' (')[0].toLowerCase())}</button>`).join('');
+  }
+  function ligarSob(el) {
+    el.querySelectorAll('[data-sob]').forEach(b => b.onclick = () => {
+      const fm = A.tipo(proc).frentes.find(x => x.id === b.dataset.sob);
+      const f = { id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna || null, na: false, itens: fm.passos.map(A.itemDoModelo) };
+      f.itens.forEach(i => A.ajustarPublico(proc, i));
+      proc.frentes.push(f); abertas.add(f.id);
+      A.anotar(proc, 'Sistema', `Itens de ${fm.nome} acrescentados.`);
+      salvarE();
+      A.avisar(`${fm.nome}: ${f.itens.length} itens acrescentados.`, () => { proc.frentes = proc.frentes.filter(x => x !== f); proc.diario.pop(); salvarE(); });
+    });
   }
 
   /* ---------- "Agora": o que está com você e o que espera outras unidades, nesta fase ---------- */
@@ -447,11 +524,8 @@
       const fr = proc.frentes.filter(f => f.fase === fa.id);
       let corpo = '';
       if (fa.id === 'evento') corpo = roteiroHTML() + `<div class="portao"><p><strong>${A.fmt(proc.inicio)}${proc.fim && proc.fim !== proc.inicio ? ' a ' + A.fmt(proc.fim) : ''}</strong>${proc.horario ? ', ' + A.esc(proc.horario) : ''}${proc.local ? ', ' + A.esc(proc.local) : ''}.</p><p class="secundario" style="margin-top:4px">${A.dias(proc.inicio) > 0 ? `Faltam ${A.dias(proc.inicio)} dias. Os prazos das outras fases são contados a partir destas datas.` : 'O evento já começou.'}</p></div>`;
-      else if (fa.id === 'inicio' && A.guiaAplica(proc)) {
-        const nPassos = fr.reduce((s, f) => s + f.itens.filter(x => !x.na).length, 0);
-        corpo = A.guiaHTML(proc, pode()) + `<details class="guia-lista"${A.prefs().guiaListaAberta ? ' open' : ''}><summary>Ver todos os passos do início (${nPassos})</summary>${portaoHTML()}<div class="frentes">${fr.map(frenteHTML).join('')}</div></details>`;
-      }
-      else corpo = (fa.id === 'inicio' ? portaoHTML() : '') + agoraHTML(fa) + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>`;
+      else if (fa.id === 'inicio') corpo = encaminhamentosHTML() + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>` + gruposSobHTML(fa);
+      else corpo = agoraHTML(fa) + `<div class="frentes">${fr.map(frenteHTML).join('')}</div>` + gruposSobHTML(fa);
       return `<section class="fase" id="fase-${fa.id}" aria-labelledby="h-${fa.id}"><div class="fase-topo"><h2 id="h-${fa.id}">${i + 1}. ${fa.n}</h2>${SUB_FASE[fa.id] ? `<p class="secundario">${SUB_FASE[fa.id]}</p>` : ''}</div>${corpo}</section>`;
     }).join('')
       + (uma ? `<nav class="fase-nav" aria-label="Trocar de fase">
@@ -470,8 +544,7 @@
       if (li) { A.rolarAte(li); li.classList.add('brilho'); setTimeout(() => li.classList.remove('brilho'), 1600); const cb = li.querySelector('input'); if (cb) cb.focus({ preventScroll: true }); }
     });
     const gl = el.querySelector('.guia-lista'); if (gl) gl.ontoggle = () => { A.prefs().guiaListaAberta = gl.open; A.salvar(); };
-    const guia = el.querySelector('.guia');
-    if (guia) A.guiaLigar(guia, proc, { redesenhar: () => { faseVista = 'inicio'; A.salvar(); desenhar(); }, irParaFase: id => { desenharTopo(); irParaFase(id); } });
+    ligarEncaminhamentos(el); ligarSob(el);
   }
   function ligarFases(el) {
     el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => {
@@ -843,8 +916,8 @@
     if (procAnterior !== id) {
       // abre só o grupo da próxima tarefa sua, para não mostrar checklist demais de uma vez
       const prox = proc.frentes.filter(f => !f.na && !A.travada(proc, f)).flatMap(f => f.itens.filter(i => !i.na && i.estado !== 'feita' && i.quem !== 'acompanha').map(i => ({ f, p: A.prazo(proc, i) || '9999' }))).sort((a, b) => a.p < b.p ? -1 : 1)[0];
-      abertas = new Set(prox ? [prox.f.id] : []);
-      formDespacho = null; editandoPasso = null; formSei = false; editandoDados = false; ultimaFicha = null; procAnterior = id; faseVista = null;
+      abertas = new Set([...(prox ? [prox.f.id] : []), ...proc.frentes.filter(f => f.fase === 'inicio' && !f.na).map(f => f.id)]); // o checklist do Início fica sempre à vista
+      formDespacho = null; editandoPasso = null; formSei = false; editandoDados = false; ultimaFicha = null; procAnterior = id; faseVista = null; formEnc = false; respondendo = null;
     }
     vista.innerHTML = `<main>
       <nav class="trilha" aria-label="Você está em"><a href="#/painel">${A.ic('anterior')}Painel</a><span aria-hidden="true">/</span><a href="#/processos">Processos</a><span aria-hidden="true">/</span><span aria-current="page" id="trilhaTitulo"></span></nav>

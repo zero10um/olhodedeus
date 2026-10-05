@@ -83,14 +83,9 @@
       </section>
 
       <section class="cartao-form" aria-labelledby="t-padrao">
-        <h2 id="t-padrao">Regras da equipe</h2>
-        <p class="secundario" style="max-width:66ch">São as regras de prazo que cada servidor recebe ao criar o perfil. Depois, cada um pode ajustar as suas.
-          ${padrao ? `Padrão atual: as suas regras, gravadas em ${A.fmtAno(padrao.gravadoEm || hoje)}.` : 'Padrão atual: as regras que vêm com o sistema.'}</p>
-        <div class="form-botoes" style="justify-content:flex-start;flex-wrap:wrap">
-          <button class="btn btn-primario" type="button" id="usarMinhas">Usar as minhas regras como padrão</button>
-          <a class="btn" href="#/regras">Ver as minhas regras</a>
-          ${padrao ? '<button class="btn" type="button" id="aplicarTodos">Copiar o padrão para todos os servidores</button>' : ''}
-        </div>
+        <h2 id="t-padrao">Tipos e regras da equipe</h2>
+        <p class="secundario" style="max-width:66ch">Os tipos de processo, os checklists e os prazos agora são um só conjunto para toda a equipe, e só a administração muda. Toda mudança vai sozinha para os processos em andamento.</p>
+        <div class="form-botoes" style="justify-content:flex-start"><a class="btn btn-primario" href="#/regras">Abrir Regras de prazo</a></div>
       </section>
 
       <section class="cartao-form" id="copias" aria-labelledby="t-copias">
@@ -169,23 +164,6 @@
       A.avisar(`"${nome}" saiu da lista.`, () => guardarSalas(antes));
     });
 
-    // regras da equipe
-    $('#usarMinhas').onclick = () => {
-      const antes = eq.regras;
-      eq.regras = { ...A.clonar(A.regras(A.euId())), gravadoEm: hoje };
-      A.salvar(); A.redesenhar();
-      A.avisar('Pronto: quem criar perfil daqui para frente recebe as suas regras.', () => { if (antes) eq.regras = antes; else delete eq.regras; A.salvar(); A.redesenhar(); });
-    };
-    const at = $('#aplicarTodos');
-    if (at) at.onclick = () => {
-      const outros = A.estado.perfis.filter(p => p.id !== A.euId());
-      if (!outros.length) return A.avisar('Ainda não há outros servidores.');
-      if (!confirm(`Trocar as regras de ${outros.length} servidor${outros.length > 1 ? 'es' : ''} pelo padrão da equipe? Os processos já cadastrados não mudam.`)) return;
-      const antes = outros.map(p => [p.id, A.estado.regras[p.id]]);
-      outros.forEach(p => { const r = A.clonar(eq.regras); delete r.gravadoEm; A.estado.regras[p.id] = r; });
-      A.salvar();
-      A.avisar('Regras copiadas para todos.', () => { antes.forEach(([id, r]) => { A.estado.regras[id] = r; }); A.salvar(); });
-    };
 
     // cópias
     vista.querySelectorAll('[data-copia]').forEach(b => b.onclick = async () => {

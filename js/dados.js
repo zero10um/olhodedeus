@@ -37,6 +37,7 @@
     ['regras', 'prefs', 'leituras', 'config'].forEach(k => { if (!e[k] || typeof e[k] !== 'object') e[k] = {}; });
     if (e.config.lgpd === undefined) e.config.lgpd = true;
     e.perfis.forEach(p => { if (!e.regras[p.id]) e.regras[p.id] = A.regrasPadrao(); });
+    e.processos.forEach(p => A.migrarProcesso(p));
   };
   A.modo = 'local';
   let timer = null;
@@ -150,9 +151,20 @@
     return A.estado.prefs[id];
   };
   A.regras = (perfilId) => {
+    // Na versão da equipe, os tipos e as regras são um só conjunto, mantido pela administração
+    if (A.modo === 'nuvem' && A.nuvem && A.nuvem.tipo === 'supabase') {
+      const eq = A.estado.equipe || (A.estado.equipe = {});
+      if (!eq.regras || !Array.isArray(eq.regras.tipos)) {
+        const base = A.estado.regras[A.euId()];
+        eq.regras = base && Array.isArray(base.tipos) ? A.clonar(base) : A.regrasPadrao();
+      }
+      if (A.atualizarModelos) A.atualizarModelos(eq.regras);
+      return eq.regras;
+    }
     const id = perfilId || (A.sessao && A.sessao.perfilId);
     if (!A.estado.regras[id]) A.estado.regras[id] = A.regrasPadrao();
     const r = A.estado.regras[id];
+    if (A.atualizarModelos) A.atualizarModelos(r);
     // regras antigas ganham os modelos novos (sem mexer no que a pessoa já ajustou)
     if ((r.versaoModelo || 1) < 3 && A.MODELOS_V2) {
       const tem = new Set(r.tipos.map(t => t.id));
@@ -162,8 +174,16 @@
     return r;
   };
   /* Um passo do modelo vira um passo do processo */
-  A.itemDoModelo = pm => ({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref }, estado: 'aberta', coluna: pm.coluna || null,
-    na: false, editado: false, quem: pm.quem || 'faz', obrig: !!pm.obrig, ...(pm.setor ? { setor: pm.setor } : {}) });
+  A.itemDoModelo = pm => ({ id: 'i' + A.uid(), modeloId: pm.id, nome: pm.nome, regra: { dias: +pm.dias, quando: pm.quando, ref: pm.ref, ...(pm.semPrazo ? { semPrazo: true } : {}) }, estado: 'aberta', coluna: pm.coluna || null,
+    na: false, editado: false, quem: pm.quem || 'faz', obrig: !!pm.obrig, ...(pm.depAut ? { depAut: true } : {}), ...(pm.para ? { para: pm.para } : {}), ...(pm.setor ? { setor: pm.setor } : {}) });
+  /* Item só para servidores ou só para membros: some (não se aplica) quando o público não bate */
+  A.ajustarPublico = (proc, i) => {
+    if (!i.para) return;
+    const fora = proc.publico && proc.publico !== 'ambos' && proc.publico !== i.para;
+    if (fora && !i.na) { i.na = true; i.naPor = 'publico'; }
+    else if (!fora && i.na && i.naPor === 'publico') { i.na = false; delete i.naPor; }
+  };
+  A.aplicarPublico = proc => proc.frentes.forEach(f => f.itens.forEach(i => A.ajustarPublico(proc, i)));
   A.avatar = (p, cls = '') => p ? `<span class="avatar ${cls}" style="--c:${p.cor};--cbg:${p.bg}" aria-hidden="true">${A.esc(p.ini.replace(/\./g, ''))}</span>` : '';
 
   /* ---------- Processos ---------- */
@@ -183,6 +203,7 @@
   /* Prazo de um passo: conta a partir da data de referência */
   A.prazo = (proc, item) => {
     const r = item.regra || {};
+    if (r.semPrazo) return null;
     const base = r.ref === 'fim' ? (proc.fim || proc.inicio) : r.ref === 'limite' ? (proc.limite || proc.inicio) : r.ref === 'entrada' ? proc.entrada : (proc.inicio || proc.limite);
     if (!base) return null;
     return A.somar(base, r.quando === 'depois' ? +r.dias : -r.dias);
@@ -190,6 +211,7 @@
   A.REFS = { inicio: 'do início do evento', fim: 'do fim do evento', limite: 'da data limite', entrada: 'da entrada no setor' };
   A.regraTexto = r => {
     if (!r) return '';
+    if (r.semPrazo) return 'sem prazo';
     if (+r.dias === 0) return r.ref === 'entrada' ? 'no dia da entrada' : r.ref === 'limite' ? 'na data limite' : r.ref === 'fim' ? 'no último dia do evento' : 'no primeiro dia do evento';
     const ref = { inicio: 'do evento', fim: 'do fim do evento', limite: 'da data limite', entrada: 'da entrada no setor' }[r.ref] || '';
     return `${r.dias} dia${+r.dias === 1 ? '' : 's'} ${r.quando === 'depois' ? 'depois' : 'antes'} ${ref}`;
@@ -203,13 +225,11 @@
     return { ref, dias: Math.abs(n), quando: n > 0 ? 'depois' : 'antes' };
   };
   /* Só trava quando a pessoa disse que NÃO estava previsto; dá para destravar sem esperar */
-  A.aprovado = proc => proc.previsto !== false || !!proc.destravado || (proc.portao || []).every(Boolean);
+  A.aprovado = () => true; // o Início virou checklist: nada fica travado esperando resposta
 
   /* Sugestões de passos: aparecem embaixo de cada frente e entram com um clique.
      Dependem do que já se sabe do processo (previsto? resposta do financeiro? externo?). */
   A.SUGESTOES = [
-    // quando NÃO estava previsto, a autorização do PGJ e a origem do recurso ficam na pergunta do topo
-    { f: 'instrucao', se: p => p.previsto !== false || A.aprovado(p), nome: 'Despachar ao setor financeiro para iniciar os trâmites', dias: 50 },
     { f: 'financeira', se: p => !p.financeiro, nome: 'Pedir a estimativa de custo ao setor financeiro', dias: 50 },
     { f: 'financeira', se: p => p.financeiro === 'remanejar' || p.recurso === 'remanejamento', nome: 'Avisar a DOF sobre o remanejamento', dias: 45 },
     { f: 'financeira', se: p => p.financeiro === 'suplementar' || p.recurso === 'suplementacao', nome: 'Pedir a suplementação orçamentária', dias: 45 },
@@ -224,7 +244,7 @@
     return A.SUGESTOES.filter(s => s.f === f.modeloId && s.se(p) && !tem.has(A.semAcento(s.nome)));
   };
   A.RESPOSTA_FIN = { tem: 'Tem recurso', remanejar: 'Precisa remanejar', suplementar: 'Precisa suplementar' };
-  A.travada = (proc, f) => f.fase !== 'inicio' && !A.aprovado(proc);
+  A.travada = () => false;
   A.itensAtivos = proc => proc.frentes.filter(f => !f.na && !A.travada(proc, f)).flatMap(f => f.itens.filter(i => !i.na).map(i => ({ proc, f, i })));
   A.despachoAberto = (proc, item) => proc.despachos.find(a => a.itemId === item.id && !a.resposta);
 
@@ -352,7 +372,7 @@
     return () => { if (!l.includes(p)) l.splice(Math.min(pos, l.length), 0, p); A.salvar(); };
   };
   /* Passo a passo (guiado) ou simples (checklist e quadro) */
-  A.ESTILOS = { guiado: ['Passo a passo', 'Uma fase por vez, com o início guiado e sugestões.'], simples: ['Simples', 'Número, nome, data e um checklist. Painel mais limpo, em quadro.'] };
+  A.ESTILOS = { guiado: ['Passo a passo', 'Uma fase por vez, com o checklist do Início e sugestões.'], simples: ['Simples', 'Número, nome, data e um checklist. Painel mais limpo, em quadro.'] };
   A.definirEstilo = v => {
     const pr = A.prefs(); pr.estilo = v;
     pr.modoProc = v === 'simples' ? 'lista' : 'frentes';
@@ -361,6 +381,63 @@
   };
   /* Evento da escola: o que a EMPRO organiza. Externo, custeio e certificação ficam fora da agenda da equipe. */
   A.ehEventoDaEscola = p => { const t = A.tipo(p) || {}; return p.ambito !== 'externo' && t.ref === 'evento' && !['evento-externo', 'custeio-externo', 'certificacao'].includes(p.tipoId); };
+  /* Evento interno / externo / outro, também para processos de tipos antigos */
+  A.grupoDoTipo = p => { const t = A.tipo(p) || {}; return t.grupo || (A.TIPOS_ANTIGOS || {})[p.tipoId] || (p.ambito === 'externo' ? 'externo' : null); };
+  A.GRUPOS = { interno: 'Evento interno', externo: 'Evento externo' };
+
+  /* ---------- Encaminhamentos: um despacho pode ir a vários destinos ao mesmo tempo ----------
+     Cada destino vira um registro em proc.despachos (o mesmo que o painel e os avisos já leem):
+     enviado → aguardando → respondido (autorizado / indeferido / ciência). Enviar não é resolver. */
+  A.RESULTADOS = { autorizado: 'Autorizado / favorável', indeferido: 'Indeferido / sem recurso', ciencia: 'Só ciência' };
+  const PISTAS = { 'PGJ': /pgj/, 'DOF': /\bdof\b/, 'DA': /\bda\b|portaria/, 'Setor financeiro (EMPRO)': /setor financeiro/ };
+  A.itemDoDestino = (proc, setor) => {
+    const re = PISTAS[setor]; if (!re) return null;
+    const ini = proc.frentes.filter(f => f.fase === 'inicio' && !f.na).flatMap(f => f.itens.filter(i => !i.na && i.estado !== 'feita'));
+    return ini.find(i => re.test(A.semAcento(i.nome)) && i.quem !== 'acompanha') || null;
+  };
+  A.registrarEncaminhamento = (proc, destinos, data, texto) => {
+    const grupo = 'g' + A.uid(), criados = [];
+    destinos.forEach(setor => {
+      const it = A.itemDoDestino(proc, setor);
+      const d = { id: 'a' + A.uid(), grupo, itemId: it ? it.id : null, setor, texto: texto || '', enviado: data || A.hojeIso() };
+      proc.despachos.push(d); criados.push(d);
+      if (it) it.estado = 'esperando';
+    });
+    A.anotar(proc, 'Despacho', `Encaminhado a ${destinos.join(' e ')}${texto ? ': ' + texto : ''}.`);
+    return criados;
+  };
+  A.responderDespacho = (proc, d, resultado, data, nota) => {
+    d.resposta = data || A.hojeIso(); d.resultado = resultado; if (nota) d.nota = nota;
+    const it = d.itemId ? A.acharItem(proc, d.itemId) : null;
+    if (it && !proc.despachos.some(x => x.itemId === it.i.id && !x.resposta)) { it.i.estado = 'feita'; it.i.feitoEm = d.resposta; }
+    A.anotar(proc, 'Resposta', `${d.setor}: ${A.RESULTADOS[resultado].toLowerCase()}${nota ? '. ' + nota : ''}.`);
+    if (resultado === 'indeferido') {
+      const ini = proc.frentes.find(f => f.fase === 'inicio') || proc.frentes[0];
+      const nome = `Decidir o que fazer após a negativa de ${d.setor}: pedir de novo, ajustar ou arquivar`;
+      if (ini && !ini.itens.some(i => i.nome === nome && i.estado !== 'feita'))
+        ini.itens.push({ id: 'i' + A.uid(), modeloId: null, nome, regra: { dias: 0, quando: 'antes', ref: 'inicio', semPrazo: true }, estado: 'aberta', coluna: null, na: false, editado: true, quem: 'faz', obrig: true });
+    }
+  };
+  /* Há pedido à PGJ esperando resposta, ou indeferido? (para o aviso "Ainda não há autorização") */
+  A.semAutorizacao = proc => {
+    const pgj = proc.despachos.filter(d => /pgj/i.test(d.setor || ''));
+    return pgj.length > 0 && !pgj.some(d => d.resultado === 'autorizado') && pgj.some(d => !d.resposta || d.resultado === 'indeferido');
+  };
+
+  /* Processos do Início guiado antigo passam para o checklist, sem perder nada */
+  A.migrarProcesso = p => {
+    if (!p || p.v4) return;
+    const g = p.guia || {};
+    (p.despachos || []).forEach(d => {
+      if (d.resposta && !d.resultado) {
+        if (/pgj/i.test(d.setor || '')) d.resultado = g.pgj === 'indeferido' ? 'indeferido' : g.pgj === 'autorizado' ? 'autorizado' : 'ciencia';
+        else if (/financeiro|dof/i.test(d.setor || '')) d.resultado = p.financeiro && p.financeiro !== 'tem' ? 'ciencia' : 'autorizado';
+      }
+    });
+    if (p.previsto === true || g.plano) (p.frentes || []).forEach(f => f.itens.forEach(i => { if (/prevista? no (plano|programa)/.test(A.semAcento(i.nome)) && i.estado === 'aberta' && p.previsto !== null) { i.estado = 'feita'; i.feitoEm = i.feitoEm || A.hojeIso(); } }));
+    p.v4 = true;
+  };
+
   A.tudoFeito = p => { const it = A.itensAtivos(p); return it.length > 0 && it.every(x => x.i.estado === 'feita'); };
 
   A.novoProcesso = (dados, perfilId) => {
@@ -375,11 +452,13 @@
       frentes: [], despachos: [], seis: [], diario: [], naPlanilha: {}, origem: dados.origem || 'manual',
       criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(),
     };
-    proc.frentes = tipo.frentes.map(fm => ({
+    proc.frentes = tipo.frentes.filter(fm => !fm.sob).map(fm => ({
       id: 'f' + A.uid(), modeloId: fm.id, nome: fm.nome, fase: fm.fase, icone: fm.icone, coluna: fm.coluna || null, na: !!fm.naPadrao,
       itens: fm.passos.map(A.itemDoModelo),
     }));
     A.aplicarAmbito(proc);
+    A.aplicarPublico(proc);
+    proc.v4 = true;
     A.anotar(proc, 'Sistema', proc.origem === 'planilha' ? 'Processo trazido da planilha.' : 'Processo criado no sistema.');
     return proc;
   };
