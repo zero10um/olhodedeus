@@ -2,7 +2,9 @@
    num banco compartilhado. Cada servidor entra com usuário e senha.
    Aberto direto pelo arquivo (sem internet), nada disso é usado. */
 (function (A) {
-  const URL_BANCO = 'https://ssztpibrqqmvpfciccwp.supabase.co';
+  const URL_DIRETA = 'https://ssztpibrqqmvpfciccwp.supabase.co';
+  // Na Vercel, passa pelo próprio site (rede do MP bloqueia supabase.co)
+  const URL_BANCO = /\.vercel\.app$/.test(location.hostname) ? location.origin + '/sb' : URL_DIRETA;
   const CHAVE_PUBLICA = 'sb_publishable_K3rvn6nZSP13uIkSbTH8tQ_hQ9QLqhh';
   const DOMINIO = '@olhodedeus.app'; // o e-mail é só por baixo dos panos: ninguém recebe nada
 
@@ -39,9 +41,34 @@
         ouvintes[r.col].forEach(([fn]) => fn({ metadata: { hasPendingWrites: false }, docChanges: () => [mudanca] }));
       })
       .subscribe(estado => {
-        if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT') Object.values(ouvintes).flat().forEach(([, falha]) => falha && falha({ code: 'unavailable' }));
+        // sem atualização ao vivo (o websocket não passa pelo rewrite da Vercel): consulta o banco de tempos em tempos, sem avisar ninguém
+        if (estado === 'SUBSCRIBED') pararConsulta();
+        else if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT' || estado === 'CLOSED') comecarConsulta();
       });
   }
+  /* Plano B do tempo real: a cada 30 s busca o que mudou e entrega do mesmo jeito que o tempo real entregaria */
+  let consulta = null, conhecidos = null;
+  function comecarConsulta() {
+    if (consulta) return;
+    const passar = async () => {
+      if (document.hidden) return;
+      try {
+        const { data, error } = await cliente().from('docs').select('col,id,dados');
+        if (error || !data) return;
+        const agora = {};
+        data.forEach(r => { (agora[r.col] = agora[r.col] || new Set()).add(r.id); });
+        Object.keys(ouvintes).forEach(col => {
+          const mud = data.filter(r => r.col === col).map(r => ({ type: 'modified', doc: { id: r.id, data: () => r.dados } }));
+          if (conhecidos && conhecidos[col]) conhecidos[col].forEach(id => { if (!(agora[col] && agora[col].has(id))) mud.push({ type: 'removed', doc: { id, data: () => null } }); });
+          if (mud.length) ouvintes[col].forEach(([fn]) => fn({ metadata: { hasPendingWrites: false }, docChanges: () => mud }));
+        });
+        conhecidos = agora;
+      } catch (e) { /* sem rede agora: tenta de novo na próxima volta */ }
+    };
+    consulta = setInterval(passar, 30000);
+    passar();
+  }
+  function pararConsulta() { if (consulta) { clearInterval(consulta); consulta = null; } }
   S.db = {
     collection: col => ({
       get: async () => {
