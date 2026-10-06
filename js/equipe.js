@@ -1,5 +1,5 @@
 /* Equipe: tela só da administração. Servidores e contas, senha esquecida, quem é admin,
-   passar processos, salas, regras da equipe e cópias de segurança. O banco confere quem é admin. */
+   apagar contas (só o admin principal), passar processos, salas, regras da equipe e cópias de segurança. O banco confere quem é admin. */
 (function (A) {
   let passando = null, senhaDe = null, contas = null, copias = null, carregando = false;
   const S = () => A.supa;
@@ -29,6 +29,8 @@
     const salas = (eq.salas && eq.salas.lista) || [];
     const padrao = eq.regras;
     const ultimaBaixada = A.prefs().ultimaCopiaEquipe;
+    const euPrincipal = !!(conta(A.euId()) || {}).principal;
+    const podeApagar = c => euPrincipal && c && c.id !== A.euId() && !c.principal;
 
     vista.innerHTML = `<main>
       <h1>Equipe</h1>
@@ -41,7 +43,7 @@
           <th scope="col">Servidor</th><th scope="col">Usuário</th><th scope="col">Ativos</th><th scope="col">Eventos em 30 dias</th><th scope="col">Críticos</th><th scope="col">Última mudança</th><th scope="col"><span class="sr">Ações</span></th>
         </tr></thead><tbody>
         ${linhas.map(l => `<tr>
-          <td><span style="display:inline-flex;align-items:center;gap:8px">${A.avatar(l.p)}<strong>${A.esc(l.p.ini)}</strong>${l.p.id === A.euId() ? ' <span class="secundario">(você)</span>' : ''}${l.c && l.c.admin ? ' <span class="novo" style="animation:none">admin</span>' : ''}</span></td>
+          <td><span style="display:inline-flex;align-items:center;gap:8px">${A.avatar(l.p)}<strong>${A.esc(l.p.ini)}</strong>${l.p.id === A.euId() ? ' <span class="secundario">(você)</span>' : ''}${l.c && l.c.admin ? ` <span class="novo" style="animation:none">${l.c.principal ? 'admin principal' : 'admin'}</span>` : ''}</span></td>
           <td>${l.c ? A.esc(l.c.usuario) : '<span class="secundario">…</span>'}</td>
           <td>${l.ativos.length}${l.procs.length > l.ativos.length ? ` <span class="secundario">+ ${l.procs.length - l.ativos.length} arq.</span>` : ''}</td>
           <td>${l.proximos}</td>
@@ -49,10 +51,11 @@
           <td>${l.ultima ? A.fmtAno(l.ultima.slice(0, 10)) : '<span class="secundario">nada ainda</span>'}</td>
           <td class="eq-acoes">
             <button class="btn" type="button" data-abrir="${l.p.id}">Abrir painel</button>
-            ${l.c ? `<button class="btn" type="button" data-senha="${l.p.id}">Redefinir senha</button>` : ''}
-            ${l.c && l.p.id !== A.euId() ? `<button class="btn" type="button" data-admin="${l.p.id}" data-ligar="${!l.c.admin}">${l.c.admin ? 'Tirar da administração' : 'Tornar admin'}</button>` : ''}
+            ${l.c && (!l.c.principal || l.p.id === A.euId()) ? `<button class="btn" type="button" data-senha="${l.p.id}">Redefinir senha</button>` : ''}
+            ${l.c && l.p.id !== A.euId() && !l.c.principal ? `<button class="btn" type="button" data-admin="${l.p.id}" data-ligar="${!l.c.admin}">${l.c.admin ? 'Tirar da administração' : 'Tornar admin'}</button>` : ''}
             ${l.p.id !== A.euId() && l.procs.length ? `<button class="btn" type="button" data-passar="${l.p.id}">Passar processos</button>` : ''}
-            ${l.p.id !== A.euId() && !l.procs.length ? `<button class="btn btn-perigo" type="button" data-tirar="${l.p.id}">Tirar da equipe</button>` : ''}
+            ${podeApagar(l.c) && !l.procs.length ? `<button class="btn btn-perigo" type="button" data-apagar="${l.p.id}">Apagar conta</button>`
+              : l.p.id !== A.euId() && !l.procs.length && !(l.c && l.c.principal) ? `<button class="btn btn-perigo" type="button" data-tirar="${l.p.id}">Tirar da equipe</button>` : ''}
           </td></tr>
           ${senhaDe === l.p.id ? `<tr><td colspan="7"><form class="cartao-form" id="fSenha" style="margin:4px 0 8px">
             <h3>Senha nova para ${A.esc(l.p.ini)}${l.c ? ` (usuário ${A.esc(l.c.usuario)})` : ''}</h3>
@@ -68,8 +71,12 @@
               <button class="btn btn-primario" type="submit">Passar</button><button class="btn" type="button" id="passarCancelar">Cancelar</button>
             </div><p class="secundario" style="margin-top:8px">Fica anotado no diário de cada processo. Dá para desfazer logo depois.</p></form></td></tr>` : ''}`).join('')}
         </tbody></table></div>
-        ${semPerfil.length ? `<p class="secundario" style="margin-top:10px">Contas criadas que ainda não fizeram o perfil: ${semPerfil.map(c => `<strong>${A.esc(c.usuario)}</strong>`).join(', ')}.</p>` : ''}
-        <p class="secundario" style="margin-top:8px;max-width:72ch">"Tirar da equipe" só aparece para quem não tem processos (passe os processos antes). Para bloquear a conta de vez, apague o usuário no Supabase, em Authentication → Users.</p>
+        ${semPerfil.length ? (euPrincipal
+          ? `<div style="margin-top:10px"><p class="secundario">Contas criadas que ainda não fizeram o perfil:</p><ul class="eq-salas">${semPerfil.map(c => `<li><span><strong>${A.esc(c.usuario)}</strong> <span class="secundario">criada em ${A.fmtAno(String(c.criada_em).slice(0, 10))}</span></span>${podeApagar(c) && !c.processos ? `<button class="btn btn-perigo" type="button" data-apagar="${c.id}">Apagar conta</button>` : ''}</li>`).join('')}</ul></div>`
+          : `<p class="secundario" style="margin-top:10px">Contas criadas que ainda não fizeram o perfil: ${semPerfil.map(c => `<strong>${A.esc(c.usuario)}</strong>`).join(', ')}.</p>`) : ''}
+        <p class="secundario" style="margin-top:8px;max-width:72ch">${euPrincipal
+          ? '"Apagar conta" tira o acesso de vez: a pessoa não entra mais e o perfil some. Só aparece para quem não tem processos (passe os processos antes). Não dá para desfazer.'
+          : '"Tirar da equipe" só aparece para quem não tem processos (passe os processos antes). Apagar a conta de acesso é só com o admin principal.'}</p>
       </section>
 
       <section class="cartao-form" aria-labelledby="t-salas">
@@ -137,6 +144,27 @@
         });
       };
     }
+    vista.querySelectorAll('[data-apagar]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.apagar, c = conta(id), p = A.perfil(id);
+      if (!c) return;
+      const nome = p ? `${p.ini} (usuário ${c.usuario})` : `a conta ${c.usuario}`;
+      const digitado = prompt(`Apagar ${nome}? A pessoa não vai mais conseguir entrar, e o perfil dela some. Não dá para desfazer.
+
+Para confirmar, digite o usuário: ${c.usuario}`);
+      if (digitado === null) return;
+      if (digitado.trim().toLowerCase() !== c.usuario.toLowerCase()) return A.avisar('O usuário digitado não confere. Nada foi apagado.');
+      b.disabled = true;
+      try {
+        await S().rpc('apagar_conta', { alvo: id });
+        const i = A.estado.perfis.findIndex(x => x.id === id);
+        if (i >= 0) A.estado.perfis.splice(i, 1);
+        delete A.estado.regras[id]; delete A.estado.leituras[id];
+        if (A.nuvem && A.nuvem.salvo) ['perfis', 'regras', 'leituras'].forEach(col => delete A.nuvem.salvo[col + '/' + id]);
+        if (passando === id) passando = null; if (senhaDe === id) senhaDe = null;
+        contas = null; copias = null; A.redesenhar(); carregar();
+        A.avisar(`Conta ${c.usuario} apagada.`);
+      } catch (e) { b.disabled = false; A.avisar(e.message); }
+    });
     vista.querySelectorAll('[data-tirar]').forEach(b => b.onclick = () => {
       const p = A.perfil(b.dataset.tirar);
       if (!confirm(`Tirar ${p.ini} da equipe? O perfil some da lista. A conta de acesso continua existindo até ser apagada no Supabase.`)) return;
