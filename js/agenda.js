@@ -219,7 +219,7 @@
       const linha = ehHoje && hAgora >= h0 && hAgora <= h1 ? `<div class="ag-agora" style="top:calc(var(--hora) * ${hAgora - h0})" aria-hidden="true"></div>` : '';
       return `<div class="ag-col${ehHoje ? ' hoje' : ''}${fds(d) ? ' fds' : ''}">${lista.map(x => bloco(x, d, h0)).join('')}${linha}</div>`;
     }).join('');
-    cal.innerHTML = `<div class="ag-corpo" id="agCorpo" style="--cols:${dias.length};--horas:${horasN}">
+    cal.innerHTML = `<div class="ag-corpo" id="agCorpo" tabindex="0" role="region" aria-label="Grade da semana" style="--cols:${dias.length};--horas:${horasN}">
       <div class="ag-cab"><div></div>${dias.map((d, k) => `<div class="${d === hoje ? 'hoje' : ''}"><button class="ag-dia-btn" type="button" data-dia="${d}" ${st.nivel === 'dia' ? 'disabled' : `aria-label="Aproximar em ${longa(d)}"`}><span>${st.nivel === 'dia' ? SEML[dow(d)] : SEM[dow(d)]}</span><span class="num">${A.d(d).getDate()}</span></button>
         ${temSemHora ? `<div class="ag-semhora">${semHora[k].map(e => pill(e, d, false)).join('')}</div>` : ''}</div>`).join('')}</div>
       <div class="ag-trilho"><div class="ag-horas">${Array.from({ length: horasN }, (_, k) => `<span style="top:calc(var(--hora) * ${k})">${h0 + k}h</span>`).join('')}</div>${colunas}</div>

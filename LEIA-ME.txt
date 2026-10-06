@@ -12,7 +12,9 @@ Duas formas de usar
 -------------------
 A) PELA INTERNET (a versão da equipe)
    - Endereço: https://olhodedeus.vercel.app
-   - Cada servidor cria a própria conta (usuário e senha) e o seu perfil com as iniciais.
+   - Cada servidor cria a própria conta (usuário e senha). A conta nova só passa a ver
+     o sistema depois que a administração libera, na tela Equipe. Aí a pessoa cria o
+     perfil com as iniciais.
    - Todos veem a Agenda da equipe; cada um só altera os próprios processos.
    - Os dados ficam no banco da equipe (Supabase, em São Paulo).
 
@@ -55,10 +57,12 @@ troque em Meu perfil.
 
 Administração (só quem é admin vê a tela Equipe)
 ------------------------------------------------
+- Liberar as contas novas (só libere quem você sabe que é da equipe).
 - Abrir e editar o painel de qualquer servidor; passar processos de um para outro.
 - Redefinir senha; tornar outra pessoa admin (ou tirar).
+- Apagar contas: só o admin principal, e só de quem não tem processos.
 - Cadastrar as salas e auditórios.
-- Definir as regras de prazo da equipe (o padrão de quem cria perfil).
+- Tipos de processo e regras de prazo: um conjunto só para a equipe, em Regras de prazo.
 - Cópias de segurança: o banco guarda uma cópia sozinho todo dia às 6h (as 30 últimas).
   Uma vez por semana, baixe a mais nova em Equipe e guarde no Drive.
 

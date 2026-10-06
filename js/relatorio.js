@@ -72,7 +72,7 @@
         <div class="form-botoes" style="justify-content:flex-start"><button class="btn btn-primario btn-grande" type="button" id="relBaixar" ${dados.processos.length ? '' : 'disabled'}>${A.ic('baixar')} Baixar a planilha (.xlsx)</button></div>
       </section>
       ${dados.processos.length ? `<section style="margin-top:24px" aria-labelledby="t-prev"><h2 id="t-prev">Prévia</h2>
-        <div class="tabela-rolagem" style="margin-top:8px"><table class="tabela"><thead><tr>${cab.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead>
+        <div class="tabela-rolagem" tabindex="0" role="region" aria-label="Tabela do relatório" style="margin-top:8px"><table class="tabela"><thead><tr>${cab.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead>
         <tbody>${dados.processos.slice(0, 12).map(l => `<tr>${cab.map(c => `<td>${A.esc(l[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         ${dados.processos.length > 12 ? `<p class="secundario" style="margin-top:6px">Mais ${dados.processos.length - 12} na planilha.</p>` : ''}</section>` : ''}
       <section class="cartao-form" aria-labelledby="t-copia">

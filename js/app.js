@@ -52,6 +52,8 @@
     if (A.sessao.acesso === 'convidado') faixas.push(`<div class="faixa-acesso">${A.ic('pessoa')} Você está no painel de <strong>${A.esc(dono.ini)}</strong> e pode editar, ${supa ? 'como administração' : 'porque a pessoa permitiu'}. <a href="#/entrar" id="sairFaixa">Voltar à tela inicial</a></div>`);
     const lemb = lembreteAgora();
     if (lemb) faixas.push(`<div class="faixa-aviso faixa-lembrete">${A.ic('relogio')} São ${A.esc(lemb.hora)}: hora de atualizar a planilha. ${lemb.n ? `${lemb.n} mudança${lemb.n > 1 ? 's' : ''} esperando.` : 'Nada esperando hoje.'} <a href="#/planilha" id="lembIr">Abrir a planilha</a> <button type="button" class="btn-texto" id="lembOk">Hoje não</button></div>`);
+    if (supa && A.nuvem.admin && A.nuvem.pendentes && pagina !== 'equipe')
+      faixas.push(`<div class="faixa-aviso">${A.ic('pessoa')} ${A.nuvem.pendentes === 1 ? 'Uma conta nova está' : `${A.nuvem.pendentes} contas novas estão`} esperando liberação. <a href="#/equipe">Ver na tela Equipe</a></div>`);
     if (supa && A.nuvem.admin && pagina !== 'equipe' && (!A.prefs().ultimaCopiaEquipe || A.entre(A.prefs().ultimaCopiaEquipe, A.hojeIso()) >= 7))
       faixas.push(`<div class="faixa-aviso">${A.prefs().ultimaCopiaEquipe ? 'Faz uma semana que você não guarda uma cópia da equipe fora do banco.' : 'Você ainda não guardou nenhuma cópia da equipe fora do banco.'} <a href="#/equipe" id="irCopias">Baixar e guardar no Drive</a></div>`);
     if (A.sessao.acesso === 'dono' && !A.prefs().estilo && pagina === 'painel')
@@ -169,16 +171,15 @@
       vista().innerHTML = `<main class="estreito"><p class="secundario" role="status">Conectando…</p></main>`;
       try {
         const u = (await A.supa.sessaoAtual()) || (await A.supa.telaLogin(vista()));
+        if (!(await A.supa.liberado())) await A.supa.telaAguardando(vista());
         vista().innerHTML = `<main class="estreito"><p class="secundario" role="status">Abrindo os dados da equipe…</p></main>`;
         online = await A.nuvem.iniciarSupabase(u);
+        if (A.nuvem.admin) A.supa.rpc('contas_equipe').then(c => { A.nuvem.pendentes = (c || []).filter(x => x.liberada === false).length; if (A.nuvem.pendentes) A.redesenhar(); }).catch(() => {});
       } catch (e) {
-        vista().innerHTML = `<main class="estreito"><h1>Não deu para abrir os dados</h1><p>${A.esc(e && e.message || 'Erro desconhecido')}</p><p class="secundario">Confira a internet e recarregue a página. Se continuar, avise quem administra o sistema.</p><button class="btn" onclick="App.supa.sairDaConta()">Sair e entrar de novo</button></main>`;
+        vista().innerHTML = `<main class="estreito"><h1>Não deu para abrir os dados</h1><p>${A.esc(e && e.message || 'Erro desconhecido')}</p><p class="secundario">Confira a internet e recarregue a página. Se continuar, avise quem administra o sistema.</p><button class="btn" type="button" id="sairErro">Sair e entrar de novo</button></main>`;
+        document.getElementById('sairErro').onclick = () => A.supa.sairDaConta();
         return;
       }
-    }
-    else if (window.claude && typeof window.claude.use === 'function') {
-      vista().innerHTML = `<main class="estreito"><p class="secundario" role="status">Abrindo os dados compartilhados…</p></main>`;
-      try { online = await A.nuvem.iniciar(); } catch (e) { online = false; }
     }
     if (online) {
       const N = A.nuvem, s = A.sessao;

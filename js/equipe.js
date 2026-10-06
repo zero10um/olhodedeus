@@ -6,7 +6,7 @@
 
   async function carregar() {
     if (carregando) return; carregando = true;
-    try { contas = await S().rpc('contas_equipe'); } catch (e) { contas = { erro: e.message }; }
+    try { contas = await S().rpc('contas_equipe'); A.nuvem.pendentes = contas.filter(c => c.liberada === false).length; } catch (e) { contas = { erro: e.message }; }
     try { copias = await S().rpc('lista_copias'); } catch (e) { copias = { erro: e.message }; }
     carregando = false;
     if (location.hash === '#/equipe') A.redesenhar();
@@ -25,7 +25,8 @@
       return { p, c: conta(p.id), procs, ativos, proximos: ativos.filter(x => x.inicio && x.inicio >= hoje && x.inicio <= em30).length,
         criticos: ativos.filter(x => A.situacao(x) === 'critico').length, ultima };
     });
-    const semPerfil = Array.isArray(contas) ? contas.filter(c => !A.perfil(c.id)) : [];
+    const semPerfil = Array.isArray(contas) ? contas.filter(c => !A.perfil(c.id) && c.liberada !== false) : [];
+    const pendentes = Array.isArray(contas) ? contas.filter(c => c.liberada === false) : [];
     const salas = (eq.salas && eq.salas.lista) || [];
     const padrao = eq.regras;
     const ultimaBaixada = A.prefs().ultimaCopiaEquipe;
@@ -36,6 +37,12 @@
       <h1>Equipe</h1>
       <p class="secundario" style="margin-top:6px;max-width:64ch">Só a administração vê esta tela. Para a equipe, todo mundo aparece como Servidor.</p>
       ${contas && contas.erro ? `<p class="aviso-conflito" style="max-width:70ch">${A.ic('alerta')}<span>${A.esc(contas.erro)}</span></p>` : ''}
+
+      ${pendentes.length ? `<section class="cartao-form" aria-labelledby="t-pend" style="margin-top:24px">
+        <h2 id="t-pend">Esperando liberação <span class="secundario" style="font-size:var(--t-base)">(${pendentes.length})</span></h2>
+        <p class="secundario" style="max-width:66ch">Contas criadas que ainda não veem nada do sistema. Libere só quem você sabe que é da equipe. ${euPrincipal ? 'Se não reconhecer a conta, apague.' : 'Se não reconhecer a conta, avise o admin principal para apagar.'}</p>
+        <ul class="eq-salas">${pendentes.map(c => `<li><span>${A.esc(c.usuario)} <span class="secundario" style="font-weight:400">criada em ${A.fmtAno(String(c.criada_em).slice(0, 10))}</span></span><button class="btn btn-primario" type="button" data-liberar="${c.id}">Liberar</button>${podeApagar(c) && !c.processos ? `<button class="btn btn-perigo" type="button" data-apagar="${c.id}">Apagar conta</button>` : ''}</li>`).join('')}</ul>
+      </section>` : ''}
 
       <section style="margin-top:24px" aria-labelledby="t-serv">
         <h2 id="t-serv">Servidores <span class="secundario" style="font-size:var(--t-base)">(${linhas.length})</span></h2>
@@ -144,6 +151,12 @@
         });
       };
     }
+    vista.querySelectorAll('[data-liberar]').forEach(b => b.onclick = async () => {
+      const c = conta(b.dataset.liberar); if (!c) return;
+      b.disabled = true;
+      try { await S().rpc('liberar_conta', { alvo: c.id, ligar: true }); A.avisar(`Conta ${c.usuario} liberada. A pessoa já pode entrar e criar o perfil.`); contas = null; copias = null; carregar(); }
+      catch (e) { b.disabled = false; A.avisar(e.message); }
+    });
     vista.querySelectorAll('[data-apagar]').forEach(b => b.onclick = async () => {
       const id = b.dataset.apagar, c = conta(id), p = A.perfil(id);
       if (!c) return;

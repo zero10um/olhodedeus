@@ -1,6 +1,6 @@
-/* Nuvem: quando o sistema roda como página do Claude, os dados ficam no banco compartilhado
-   da página (capability "db"). Cada pessoa entra com a própria conta do Claude.
-   Aberto direto pelo arquivo, nada disso existe e o sistema guarda no navegador, como antes. */
+/* Nuvem: na versão da equipe, sincroniza o estado da tela com o banco (Supabase).
+   Só grava o que mudou, e só o que a pessoa pode gravar (admin grava tudo).
+   Aberto direto pelo arquivo, nada disso existe e o sistema guarda no navegador. */
 (function (A) {
   const N = A.nuvem = { tipo: null, db: null, user: null, eu: null, dono: false, podeEscrever: null, salvo: {}, gravando: false, pendente: false, status: 'salvo', faltam: 0 };
 
@@ -23,20 +23,6 @@
     Object.keys(alvo).forEach(k => delete alvo[k]);
     Object.assign(alvo, A.clonar(dados));
   }
-
-  N.iniciar = async () => {
-    if (!window.claude || typeof window.claude.use !== 'function') return false;
-    const db = await window.claude.use('db');
-    const user = await window.claude.use('user');
-    const id = user ? await user.id() : null;
-    if (!db || !id) return false;
-    Object.assign(N, { tipo: 'claude', db, user, eu: id });
-    N.dono = await user.isOwner();
-    N.podeEscrever = await user.can('data.write');
-    const dl = await window.claude.use('downloads');
-    A.salvarArquivo = dl ? (nome, dados) => dl.save({ filename: nome, data: dados }) : null;
-    return carregar(db, id);
-  };
 
   /* Versão publicada na internet: banco do Supabase, cada um entra com usuário e senha */
   N.iniciarSupabase = async usuario => {

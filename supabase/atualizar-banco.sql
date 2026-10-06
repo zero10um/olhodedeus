@@ -1,70 +1,16 @@
--- Banco da Agenda pedagógica (olhodedeus)
+-- Atualização do banco (outubro/2026)
 -- Como usar: no Supabase, abra "SQL Editor", cole tudo isto e clique em "Run".
--- Pode rodar mais de uma vez sem problema (a versão nova substitui a antiga).
-
--- Uma tabela só guarda tudo: perfis, regras, processos, preferências e o padrão da equipe.
-create table if not exists public.docs (
-  col        text        not null,               -- perfis | regras | leituras | processos | prefs | equipe
-  id         text        not null,
-  dono       uuid        not null default auth.uid() references auth.users (id) on delete cascade,
-  dados      jsonb       not null,
-  atualizado timestamptz not null default now(),
-  primary key (col, id)
-);
-
--- Guarda a hora da última mudança
-create or replace function public.docs_atualizado() returns trigger
-language plpgsql set search_path = '' as $$
-begin new.atualizado := now(); return new; end $$;
-drop trigger if exists docs_atualizado on public.docs;
-create trigger docs_atualizado before update on public.docs
-  for each row execute function public.docs_atualizado();
-
--- Administração: quem está nesta tabela é admin. Ninguém consegue se colocar aqui pelo site;
--- só por este editor SQL (veja o arquivo tornar-admin.sql).
-create table if not exists public.admins (
-  user_id uuid primary key references auth.users (id) on delete cascade
-);
-alter table public.admins enable row level security;
-revoke all on public.admins from anon, authenticated;
-grant select on public.admins to authenticated;
-drop policy if exists "ver se sou admin" on public.admins;
-create policy "ver se sou admin" on public.admins for select to authenticated
-  using (user_id = (select auth.uid()));
-
-create or replace function public.sou_admin() returns boolean
-language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.admins where user_id = auth.uid())
-$$;
-revoke execute on function public.sou_admin() from public, anon;
-grant execute on function public.sou_admin() to authenticated;
-
--- Segurança (RLS):
---  * só quem entrou com usuário e senha E foi liberado pela administração enxerga alguma coisa;
---  * todo mundo da equipe VÊ os processos e perfis de todos;
---  * cada servidor só CRIA, MUDA ou APAGA o que é dele;
---  * o admin pode mexer em tudo (menos nas preferências pessoais de cada um)
---    e é o único que grava o padrão da equipe;
---  * preferências pessoais só a própria pessoa vê.
-alter table public.docs enable row level security;
-alter table public.docs replica identity full;
-
-revoke all on public.docs from anon;
-grant select, insert, update, delete on public.docs to authenticated;
-
--- As regras de acesso (policies) ficam mais abaixo, depois da liberação de contas.
-
--- Avisos em tempo real: quando alguém salva, a tela dos colegas atualiza sozinha
-do $$ begin
-  alter publication supabase_realtime add table public.docs;
-exception when duplicate_object then null; end $$;
-
--- =====================================================================
--- Administração: contas, senha esquecida, quem mais pode ser admin e apagar contas
--- (o admin principal é o mais antigo; só ele apaga contas)
--- (tudo confere no banco se quem pediu é admin)
--- =====================================================================
-create extension if not exists pgcrypto with schema extensions;
+-- Pode rodar mais de uma vez sem problema. Já inclui o antigo apagar-contas.sql.
+--
+-- O que muda:
+--  1. Admin principal (o admin mais antigo): só ele apaga contas.
+--  2. Conta nova só lê e grava depois que a administração liberar (tela Equipe).
+--     Quem já tem conta hoje continua entrando normalmente.
+--  3. O e-mail interno das contas passa para @olhodedeus.vercel.app
+--     (o domínio antigo, olhodedeus.app, foi registrado por outra pessoa). Usuário e senha não mudam.
+--  4. Redefinir a senha de alguém derruba as sessões abertas dessa pessoa.
+--  5. O banco só aceita os tipos de documento do sistema, com tamanho limitado.
+-- A consulta do fim mostra todas as contas: confira se são todas da equipe e quem é o admin principal.
 
 -- ---------- 1. Admin principal ----------
 alter table public.admins add column if not exists principal boolean not null default false;
@@ -241,66 +187,10 @@ alter table public.docs drop constraint if exists docs_tamanho;
 alter table public.docs add constraint docs_tamanho check (pg_column_size(dados) < 1000000) not valid;
 -- a consulta periódica busca só o que mudou: este índice deixa isso rápido
 create index if not exists docs_atualizado on public.docs (atualizado);
-revoke execute on function public.redefinir_senha(uuid, text) from public, anon;
-revoke execute on function public.definir_admin(uuid, boolean) from public, anon;
-grant execute on function public.redefinir_senha(uuid, text) to authenticated;
-grant execute on function public.definir_admin(uuid, boolean) to authenticated;
 
--- =====================================================================
--- Cópia de segurança automática: todo dia às 6h (Brasília) o banco guarda
--- um retrato de tudo; ficam as 30 últimas. Só a administração baixa.
--- =====================================================================
-create table if not exists public.copias (
-  id       bigserial primary key,
-  feita_em timestamptz not null default now(),
-  itens    int not null,
-  dados    jsonb not null
-);
-alter table public.copias enable row level security;
-revoke all on public.copias from anon, authenticated;
-
-create or replace function public.fazer_copia()
-returns void language plpgsql security definer set search_path = '' as $$
-begin
-  insert into public.copias (itens, dados)
-    select count(*), coalesce(jsonb_agg(jsonb_build_object('col', col, 'id', id, 'dados', dados)), '[]'::jsonb)
-    from public.docs where col <> 'prefs';
-  delete from public.copias where id not in (select id from public.copias order by feita_em desc limit 30);
-end $$;
-revoke execute on function public.fazer_copia() from public, anon, authenticated;
-
-create or replace function public.lista_copias()
-returns table (id bigint, feita_em timestamptz, itens int)
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.sou_admin() then raise exception 'Só a administração.' using errcode = '42501'; end if;
-  return query select c.id, c.feita_em, c.itens from public.copias c order by c.feita_em desc;
-end $$;
-
-create or replace function public.baixar_copia(qual bigint)
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare r jsonb;
-begin
-  if not public.sou_admin() then raise exception 'Só a administração.' using errcode = '42501'; end if;
-  select dados into r from public.copias where id = qual;
-  return r;
-end $$;
-
-create or replace function public.copiar_agora()
-returns void language plpgsql security definer set search_path = '' as $$
-begin
-  if not public.sou_admin() then raise exception 'Só a administração.' using errcode = '42501'; end if;
-  perform public.fazer_copia();
-end $$;
-
-revoke execute on function public.lista_copias() from public, anon;
-revoke execute on function public.baixar_copia(bigint) from public, anon;
-revoke execute on function public.copiar_agora() from public, anon;
-grant execute on function public.lista_copias() to authenticated;
-grant execute on function public.baixar_copia(bigint) to authenticated;
-grant execute on function public.copiar_agora() to authenticated;
-
--- Agendamento diário (09:00 UTC = 06:00 em Brasília).
--- Se esta parte der erro, ligue a extensão "pg_cron" em Database > Extensions e rode de novo.
-create extension if not exists pg_cron;
-select cron.schedule('copia-diaria', '0 9 * * *', 'select public.fazer_copia()');
+-- ---------- Conferência ----------
+select split_part(u.email, '@', 1) as usuario, u.email as email_interno, u.created_at as criada_em,
+       exists (select 1 from public.liberados l where l.user_id = u.id) as liberada,
+       coalesce(a.principal, false) as admin_principal, a.user_id is not null as admin
+from auth.users u left join public.admins a on a.user_id = u.id
+order by u.created_at;

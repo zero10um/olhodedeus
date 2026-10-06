@@ -480,22 +480,6 @@
       A.copiar(`Informamos que a equipe da EMPRO realizará "${proc.titulo}" nas datas e locais abaixo:\n\n${linhas.join('\n')}\n\nSolicitamos, por gentileza, que cada unidade providencie o que está indicado e confirme a disponibilidade do espaço.`, 'Texto do despacho copiado. É só colar no SEI.');
     };
   }
-  function portaoHTML() {
-    const tipo = A.tipo(proc);
-    if (tipo && !tipo.aprovacao && proc.previsto !== false) return '';
-    const ok = A.aprovado(proc), dis = pode() ? '' : 'disabled';
-    const passos = ['Fazer a estimativa de custo', 'Pedir autorização ao PGJ', 'Autorização recebida'];
-    const op = (nome, v, atual, rot) => `<label><input type="radio" name="${nome}" value="${v}" ${atual ? 'checked' : ''} ${dis}><span>${rot}</span></label>`;
-    return `<div class="portao" style="view-transition-name:portao">
-      <div class="pergunta"><div><h3>Estava previsto no plano?</h3><p class="secundario">Não é obrigatório responder. Se não estava, o sistema sugere os passos de autorização.</p></div>
-        <div class="segmento" role="radiogroup" aria-label="Estava previsto no plano?">
-          ${op('previsto', 'sim', proc.previsto === true, 'Sim')}${op('previsto', 'nao', proc.previsto === false, 'Não')}${op('previsto', 'nsei', proc.previsto == null, 'Ainda não sei')}</div></div>
-      ${proc.previsto !== false ? '' : `<div class="pergunta" style="margin-top:12px"><div><h3>De onde vem o recurso?</h3><p class="secundario">Remanejamento: tira de outro evento e avisa a DOF.</p></div>
-        <div class="segmento" role="radiogroup" aria-label="De onde vem o recurso?">${op('recurso', 'suplementacao', proc.recurso === 'suplementacao', 'Suplementação')}${op('recurso', 'remanejamento', proc.recurso === 'remanejamento', 'Remanejamento')}${op('recurso', '', !proc.recurso, 'Ainda não sei')}</div></div>
-        <ul class="tarefas entra" style="margin-top:12px">${passos.map((p, i) => `<li class="tarefa${proc.portao[i] ? ' feita' : ''}"><input type="checkbox" id="pt-${i}" data-portao="${i}" ${proc.portao[i] ? 'checked' : ''} ${dis}><label class="o-que" for="pt-${i}">${p}</label><span class="prazo">${proc.portao[i] ? 'feito' : ''}</span></li>`).join('')}</ul>`}
-      <p class="liberado${ok ? '' : ' nao'}">${ok ? A.ic('feito') + (proc.previsto === false && proc.destravado && !(proc.portao || []).every(Boolean) ? ' Destravado sem esperar a autorização.' : ' Liberado: as frentes da preparação podem andar ao mesmo tempo.')
-        : A.ic('cadeado') + ` Esperando a autorização. As frentes da preparação ficam travadas.${pode() ? ' <button type="button" class="btn-texto" id="destravar">Destravar mesmo assim</button>' : ''}`}</p></div>`;
-  }
   const umaPorVez = () => !A.prefs().todasFases;
   function faseNaTela() {
     const fs = fasesVisiveis();
@@ -543,7 +527,6 @@
       const li = vistaEl.querySelector(`[data-i="${iid}"]`);
       if (li) { A.rolarAte(li); li.classList.add('brilho'); setTimeout(() => li.classList.remove('brilho'), 1600); const cb = li.querySelector('input'); if (cb) cb.focus({ preventScroll: true }); }
     });
-    const gl = el.querySelector('.guia-lista'); if (gl) gl.ontoggle = () => { A.prefs().guiaListaAberta = gl.open; A.salvar(); };
     ligarEncaminhamentos(el); ligarSob(el);
   }
   function ligarFases(el) {
@@ -590,20 +573,6 @@
       salvarE();
       A.avisar(f.na ? `${f.nome} marcada como "não se aplica".` : `${f.nome} voltou para o processo.`, () => { f.na = antes; proc.diario.pop(); });
     });
-    el.querySelectorAll('[name=previsto]').forEach(r => r.onchange = () => {
-      proc.previsto = r.value === 'sim' ? true : r.value === 'nao' ? false : null;
-      // responder a pergunta já conta como o passo "Conferir se a ação está prevista no plano"
-      proc.frentes.forEach(f => f.itens.forEach(i => { if (/prevista no plano/.test(A.semAcento(i.nome)) && !i.na) { i.estado = proc.previsto == null ? 'aberta' : 'feita'; i.feitoEm = proc.previsto == null ? undefined : A.hojeIso(); } }));
-      A.anotar(proc, 'Sistema', proc.previsto === true ? 'Marcado como previsto no plano.' : proc.previsto === false ? 'Marcado como não previsto: precisa de autorização.' : 'Previsão no plano ainda não sabida.');
-      salvarE();
-    });
-    el.querySelectorAll('[name=recurso]').forEach(r => r.onchange = () => {
-      proc.recurso = r.value;
-      A.anotar(proc, 'Sistema', r.value ? `Recurso por ${r.value === 'suplementacao' ? 'suplementação' : 'remanejamento'}.` : 'Origem do recurso ainda não sabida.');
-      salvarE();
-    });
-    const dt = el.querySelector('#destravar');
-    if (dt) dt.onclick = () => { proc.destravado = true; A.anotar(proc, 'Sistema', 'Frentes destravadas sem esperar a autorização.'); salvarE(); A.avisar('Frentes destravadas.', () => { proc.destravado = false; proc.diario.pop(); salvarE(); }); };
     el.querySelectorAll('[name^=fin-]').forEach(r => r.onchange = () => {
       proc.financeiro = r.value;
       A.anotar(proc, 'Sistema', r.value ? `Resposta do financeiro: ${A.RESPOSTA_FIN[r.value].toLowerCase()}.` : 'Resposta do financeiro ainda não chegou.');
@@ -625,12 +594,6 @@
       salvarE();
       const n = abertos.length, s = n > 1 ? 's' : '';
       A.avisar(`${fr.nome}: ${n} passo${s} marcado${s} como feito${s}.`, () => { antes.forEach(([i, e, d]) => { i.estado = e; i.feitoEm = d; }); proc.diario.pop(); salvarE(); });
-    });
-    el.querySelectorAll('[data-portao]').forEach(cb => cb.onchange = () => {
-      const i = +cb.dataset.portao, antes = A.aprovado(proc);
-      proc.portao[i] = cb.checked;
-      if (!antes && A.aprovado(proc)) { A.anotar(proc, 'Sistema', 'Aprovado. As frentes da preparação foram liberadas.'); A.avisar('Aprovado! As frentes da preparação foram liberadas.'); }
-      salvarE();
     });
     el.querySelectorAll('[data-novo]').forEach(b => b.onclick = () => {
       const id = b.dataset.novo, alvo = el.querySelector('#novo-' + id);
