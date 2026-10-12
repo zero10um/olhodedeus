@@ -20,6 +20,7 @@
           <div class="quem" role="none"><strong>Painel de ${A.esc(dono.ini)}</strong><span class="secundario">${supa ? 'Servidor' : A.esc(dono.funcao || '')}. ${modoTxt}.</span></div>
           ${A.sessao.acesso === 'dono' ? `<a role="menuitem" href="#/perfil">${A.ic('pessoa')} ${supa ? 'Meu perfil' : 'Meu perfil e códigos'}</a>` : ''}
           <a role="menuitem" href="#/${supa ? 'relatorio' : 'planilha'}">${A.ic('baixar')} ${supa ? 'Relatório e cópia' : 'Cópia de segurança'}</a>
+          <a role="menuitem" href="#/como-funciona">${A.ic('ajuda')} Como funciona</a>
           <button type="button" role="menuitem" id="trocarPessoa">${A.ic('sair')} ${A.modo === 'nuvem' ? 'Ver outro painel' : 'Trocar de pessoa'}</button>
           ${supa ? `<button type="button" role="menuitem" id="sairConta">${A.ic('cadeado')} Sair da conta (${A.esc(A.supa.usuarioDe(A.supa.usuario.email))})</button>` : ''}
         </div></div>`;
@@ -56,7 +57,7 @@
       faixas.push(`<div class="faixa-aviso">${A.ic('pessoa')} ${A.nuvem.pendentes === 1 ? 'Uma conta nova está' : `${A.nuvem.pendentes} contas novas estão`} esperando liberação. <a href="#/equipe">Ver na tela Equipe</a></div>`);
     if (supa && A.nuvem.admin && pagina !== 'equipe' && (!A.prefs().ultimaCopiaEquipe || A.entre(A.prefs().ultimaCopiaEquipe, A.hojeIso()) >= 7))
       faixas.push(`<div class="faixa-aviso">${A.prefs().ultimaCopiaEquipe ? 'Faz uma semana que você não guarda uma cópia da equipe fora do banco.' : 'Você ainda não guardou nenhuma cópia da equipe fora do banco.'} <a href="#/equipe" id="irCopias">Baixar e guardar no Drive</a></div>`);
-    if (A.sessao.acesso === 'dono' && !A.prefs().estilo && pagina === 'painel')
+    if (A.sessao.acesso === 'dono' && !A.prefs().estilo && pagina === 'painel' && A.ativos().length)
       faixas.push(`<div class="faixa-estilo">${A.ic('ajustes')}<span><strong>Como você prefere trabalhar?</strong> Dá para trocar depois em Meu perfil.</span>${Object.entries(A.ESTILOS).map(([k, [n, d]]) => `<button type="button" class="btn" data-estilo="${k}" title="${d}">${n}</button>`).join('')}</div>`);
     if (A.modo === 'nuvem') { /* online não depende de cópia de segurança */ }
     else if (!A.armazenamentoOk) faixas.push(`<div class="faixa-aviso">Este navegador não está guardando os dados. Antes de fechar, baixe a cópia de segurança em <a href="#/planilha">Planilha</a>.</div>`);
@@ -139,6 +140,7 @@
     else if (pagina === 'agenda') A.telaAgenda(v);
     else if (pagina === 'relatorio') A.telaRelatorio(v);
     else if (pagina === 'perfil') A.telaPerfil(v);
+    else if (pagina === 'como-funciona') A.telaComoFunciona(v);
     else A.telaPainel(v);
   }
   A.redesenhar = () => desenhar();

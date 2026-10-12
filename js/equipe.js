@@ -61,6 +61,7 @@
             ${l.c && (!l.c.principal || l.p.id === A.euId()) ? `<button class="btn" type="button" data-senha="${l.p.id}">Redefinir senha</button>` : ''}
             ${l.c && l.p.id !== A.euId() && !l.c.principal ? `<button class="btn" type="button" data-admin="${l.p.id}" data-ligar="${!l.c.admin}">${l.c.admin ? 'Tirar da administração' : 'Tornar admin'}</button>` : ''}
             ${l.p.id !== A.euId() && l.procs.length ? `<button class="btn" type="button" data-passar="${l.p.id}">Passar processos</button>` : ''}
+            ${l.procs.length ? `<button class="btn btn-perigo" type="button" data-limpar="${l.p.id}">Apagar todos os processos</button>` : ''}
             ${podeApagar(l.c) && !l.procs.length ? `<button class="btn btn-perigo" type="button" data-apagar="${l.p.id}">Apagar conta</button>`
               : l.p.id !== A.euId() && !l.procs.length && !(l.c && l.c.principal) ? `<button class="btn btn-perigo" type="button" data-tirar="${l.p.id}">Tirar da equipe</button>` : ''}
           </td></tr>
@@ -151,6 +152,18 @@
         });
       };
     }
+    // Limpar a conta: apaga todos os processos de uma pessoa (por exemplo, uma conta de teste)
+    vista.querySelectorAll('[data-limpar]').forEach(b => b.onclick = () => {
+      const p = A.perfil(b.dataset.limpar), procs = A.estado.processos.filter(x => x.dono === p.id);
+      const n = procs.length, s = n > 1 ? 's' : '';
+      const conf = prompt(`Apagar ${n === 1 ? 'o processo' : `os ${n} processos`} de ${p.ini}, inclusive arquivados?\n\nA conta continua existindo. Dá para desfazer logo depois; passado isso, só pela cópia de segurança.\n\nPara confirmar, digite o número de processos: ${n}`);
+      if (conf === null) return;
+      if (conf.trim() !== String(n)) return A.avisar('O número digitado não confere. Nada foi apagado.');
+      const copia = procs.slice();
+      for (let i = A.estado.processos.length - 1; i >= 0; i--) if (A.estado.processos[i].dono === p.id) A.estado.processos.splice(i, 1);
+      A.salvar(); A.redesenhar();
+      A.avisar(`${n} processo${s} de ${p.ini} apagado${s}.`, () => { A.estado.processos.push(...copia); A.salvar(); A.redesenhar(); });
+    });
     vista.querySelectorAll('[data-liberar]').forEach(b => b.onclick = async () => {
       const c = conta(b.dataset.liberar); if (!c) return;
       b.disabled = true;

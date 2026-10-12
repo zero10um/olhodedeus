@@ -578,7 +578,7 @@
   function desenharOrganizar() {
     const el = vistaEl.querySelector('#organizar'), P0 = pf();
     el.hidden = !orgAberto;
-    vistaEl.querySelector('#btnOrganizar').setAttribute('aria-expanded', orgAberto);
+    { const b = vistaEl.querySelector('#btnOrganizar'); if (b) b.setAttribute('aria-expanded', orgAberto); }
     if (!orgAberto) { el.innerHTML = ''; return; }
     el.innerHTML = `<h2 id="t-organizar">Organizar painel <span class="secundario">As mudanças aparecem na hora e ficam salvas.</span></h2>
       <fieldset><legend>Blocos que aparecem</legend>
@@ -634,20 +634,22 @@
       <section class="cabeca">
         <div><div class="dia-semana">${A.maiusc(A.semana(hoje))}</div><h1 class="data">${A.extenso(hoje)}</h1></div>
         <div class="cabeca-acoes">
-          <div class="secundario"><strong style="color:var(--tinta)">${nProc} processo${nProc === 1 ? '' : 's'} ${A.sessao.acesso === 'dono' ? (nProc === 1 ? 'seu' : 'seus') : 'de ' + A.esc(dono.ini)}</strong>${leit ? `, pela planilha lida ${leit.em.slice(0, 10) === hoje ? 'hoje' : 'em ' + A.fmt(leit.em.slice(0, 10))} às ${leit.em.slice(11, 16)}` : ', planilha ainda não lida'}</div>
+          <div class="secundario"><strong style="color:var(--tinta)">${nProc} processo${nProc === 1 ? '' : 's'} ${A.sessao.acesso === 'dono' ? (nProc === 1 ? 'seu' : 'seus') : 'de ' + A.esc(dono.ini)}</strong>${A.semPlanilha() ? '' : leit ? `, pela planilha lida ${leit.em.slice(0, 10) === hoje ? 'hoje' : 'em ' + A.fmt(leit.em.slice(0, 10))} às ${leit.em.slice(11, 16)}` : ', planilha ainda não lida'}</div>
           <div class="botoes">
-            <button class="btn" type="button" id="btnOrganizar" aria-expanded="false" aria-controls="organizar">${A.ic('ajustes')} Organizar painel</button>
-            <a class="btn" href="#/planilha" data-editar>${A.ic('atualizar')} Ler planilha</a>
+            ${nProc ? `<button class="btn" type="button" id="btnOrganizar" aria-expanded="false" aria-controls="organizar">${A.ic('ajustes')} Organizar painel</button>` : ''}
+            ${A.semPlanilha() ? '' : `<a class="btn" href="#/planilha" data-editar>${A.ic('atualizar')} Ler planilha</a>`}
             <a class="btn" href="#/processos/novo" data-editar>${A.ic('mais')} Novo processo</a>
           </div>
         </div>
       </section>
       <section class="organizar" id="organizar" hidden aria-labelledby="t-organizar"></section>
-      <nav class="resumo" id="resumo" aria-label="Resumo do dia"></nav>
+      <nav class="resumo" id="resumo" aria-label="Resumo do dia" ${nProc ? '' : 'hidden'}></nav>
       <p class="aviso-busca" id="avisoBusca" hidden></p>
-      ${nProc ? '' : `<section class="bloco boas-vindas" style="margin-top:24px"><h2>Ainda não há processos aqui</h2>
-        <p class="secundario">Para começar:</p><ol><li>Baixe a planilha de controle do OneDrive (Arquivo → Salvar como → Baixar uma cópia).</li><li>Em <strong>Ler planilha</strong>, escolha o arquivo e a sua aba.</li><li>Confira e confirme. Os processos aparecem aqui, já com os passos das Regras de prazo.</li></ol>
-        <div class="form-botoes"><a class="btn btn-primario btn-grande" href="#/planilha" data-editar>${A.ic('atualizar')} Ler a planilha agora</a><a class="btn btn-grande" href="#/processos/novo" data-editar>${A.ic('mais')} Criar um processo à mão</a><a class="btn btn-grande" href="#/regras">${A.ic('regras')} Ver as regras de prazo</a></div></section>`}
+      ${nProc ? '' : A.prefs().tutorialOculto || A.sessao.acesso !== 'dono'
+        ? `<section class="bloco boas-vindas cf-curto" style="margin-top:24px"><h2>${A.sessao.acesso === 'dono' ? 'Nenhum processo em andamento' : 'Este painel ainda não tem processos'}</h2>
+          <p class="secundario">${A.sessao.acesso === 'dono' ? 'Quando você cadastrar um processo, aqui aparecem a agenda, o que fazer hoje e o que espera resposta.' : 'Quando a pessoa cadastrar processos, eles aparecem aqui.'}</p>
+          <div class="form-botoes">${A.sessao.acesso === 'dono' ? `<a class="btn btn-primario btn-grande" href="#/processos/novo" data-editar>${A.ic('mais')} Cadastrar um processo</a>` : ''}<a class="btn btn-grande" href="#/como-funciona">${A.ic('ajuda')} Como funciona</a></div></section>`
+        : `<div style="margin-top:24px">${A.tutorialHTML({ titulo: 'Seu painel começa aqui', ocultavel: true, planilha: !A.semPlanilha() })}</div>`}
       <div id="areas" ${nProc ? '' : 'hidden'}>
         <section class="bloco" id="blocoAgenda" aria-labelledby="t-agenda">
           <div class="bloco-topo"><h2 id="t-agenda">Agenda</h2><div class="acoes"><div class="modo" id="modoAgenda"></div>
@@ -666,7 +668,9 @@
         </div>
       </div>
     </main>`;
-    vista.querySelector('#btnOrganizar').onclick = () => { orgAberto = !orgAberto; desenharOrganizar(); if (orgAberto) vista.querySelector('#organizar input')?.focus(); };
+    A.ligarTutorial(vista, () => A.mudar(A.redesenhar));
+    const bo = vista.querySelector('#btnOrganizar');
+    if (bo) bo.onclick = () => { orgAberto = !orgAberto; desenharOrganizar(); if (orgAberto) vista.querySelector('#organizar input')?.focus(); };
     vista.querySelector('#btnRecolher').onclick = () => { const P0 = pf(); P0.agendaAberta = !P0.agendaAberta; A.salvar(); if (P0.agendaAberta) desenharAgenda(); else fecharExplica(); aplicarLayout(); };
     if (orgAberto) desenharOrganizar();
     if (!nProc) { derivar(); desenharResumo(); return; }
