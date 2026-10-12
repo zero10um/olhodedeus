@@ -1,6 +1,113 @@
 /* Lista de processos e criação de um processo à mão. */
 (function (A) {
   let filtro = 'ativos', busca = '', ordem = 'situacao';
+  const abrindo = new Set(); // etiquetas abertas nos cartões ("processo|marco")
+
+  /* ---------- Visões por tipo: cartões de evento interno e trilha de evento externo ---------- */
+  const ABAS = [['interno', 'Eventos internos'], ['externo', 'Eventos externos'], ['outro', 'Outros'], ['todos', 'Lista completa']];
+  const grupoDe = p => A.grupoDoTipo(p) || 'outro';
+  const hoje = () => A.hojeIso();
+  // Preparação de evento interno: cada etiqueta junta os passos que falam daquela coisa
+  const PREPARO = [
+    ['Sala', /\bsala\b|audit[oó]rio/], ['Apoio técnico', /apoio t[eé]cnico/], ['Coffee break', /coffee|lanche/],
+    ['Comunicação', /briefing|\bartes?\b|divulga/], ['Inscrições', /inscri[cç]/], ['Deslocamento', /desloca|passage|di[aá]ria|portaria/],
+    ['Contratação', /\bdfd\b|empenho|contrat|setor financeiro|proposta/], ['Frequência', /frequ[eê]ncia|lista de presen/], ['Certificados', /certificad/],
+  ];
+  // Trilha de evento externo
+  const TRILHA = [
+    ['Pedido', /receber o pedido|pedido/], ['PGJ', /^(?!.*portaria).*pgj/], ['Portaria', /portaria/], ['Financeiro', /financeiro|passage|di[aá]ria/],
+    ['DOF', /\bdof\b/], ['Certificado', /certificad/],
+  ];
+  const ROT = { feito: 'feito', esperando: 'esperando resposta', atrasado: 'atrasado', afazer: 'a fazer' };
+  function estadoDe(proc, itens) {
+    if (!itens.length) return null;
+    if (itens.every(i => i.estado === 'feita')) return 'feito';
+    if (itens.some(i => i.estado === 'aberta' && A.prazo(proc, i) && A.dias(A.prazo(proc, i)) < 0 && proc.ambito !== 'externo')) return 'atrasado';
+    if (itens.some(i => i.estado === 'esperando')) return 'esperando';
+    return 'afazer';
+  }
+  function agrupar(proc, regras, ja) {
+    const itens = proc.frentes.filter(f => !f.na).flatMap(f => f.itens.filter(i => !i.na).map(i => ({ f, i })));
+    return regras.map(([nome, re]) => {
+      const m = itens.filter(x => !ja.has(x.i.id) && re.test(A.semAcento(x.i.nome).toLowerCase()));
+      m.forEach(x => ja.add(x.i.id));
+      return { nome, itens: m.map(x => x.i), est: estadoDe(proc, m.map(x => x.i)) };
+    }).filter(g => g.est);
+  }
+  function proximo(proc) {
+    const ab = A.itensAtivos(proc).filter(x => x.i.estado === 'aberta' && x.i.quem !== 'acompanha')
+      .map(x => ({ ...x, d: A.prazo(proc, x.i) })).sort((a, b) => (a.d || '9') < (b.d || '9') ? -1 : 1);
+    return ab[0] || null;
+  }
+  function esperas(proc) {
+    return (proc.despachos || []).filter(d => !d.resposta).map(d => `${A.esc(d.setor || 'resposta')} há ${Math.max(0, A.entre(d.enviado || hoje(), hoje()))} dia${A.entre(d.enviado || hoje(), hoje()) === 1 ? '' : 's'}`);
+  }
+  const ic = e => ({ feito: A.ic('feito', 'ic-sm'), esperando: A.ic('relogio', 'ic-sm'), atrasado: A.ic('alerta', 'ic-sm'), afazer: '' }[e]);
+  function quandoTxt(p) {
+    const ref = A.dataRef(p); if (!ref) return 'sem data';
+    const n = A.dias(ref), fim = p.fim && p.fim !== p.inicio ? A.dias(p.fim) : n;
+    if (n > 1) return `em ${n} dias`; if (n === 1) return 'amanhã'; if (n === 0) return 'hoje';
+    if (fim >= 0) return 'acontecendo agora';
+    return `há ${-fim} dia${fim === -1 ? '' : 's'}`;
+  }
+  function blocoData(p) {
+    const ref = A.dataRef(p);
+    if (!ref) return `<div class="pc-data sem" aria-hidden="true"><b>—</b><small>sem data</small></div>`;
+    const d = A.d(ref);
+    return `<div class="pc-data" aria-hidden="true"><b>${String(d.getDate()).padStart(2, '0')}</b><small>${d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</small></div>`;
+  }
+  // Grupos de tempo para os cartões
+  function porTempo(lista) {
+    const g = [['Nos próximos 30 dias', []], ['Mais adiante', []], ['Sem data', []], ['Já aconteceram: pós-evento', []]];
+    lista.forEach(p => {
+      const ref = A.dataRef(p), fim = p.fim || ref;
+      if (!ref) g[2][1].push(p); else if (A.dias(fim) < 0) g[3][1].push(p); else if (A.dias(ref) <= 30) g[0][1].push(p); else g[1][1].push(p);
+    });
+    g.forEach(([, l]) => l.sort((a, b) => (A.dataRef(a) || '9') < (A.dataRef(b) || '9') ? -1 : 1));
+    g[3][1].reverse();
+    return g.filter(([, l]) => l.length);
+  }
+  function cartaoInterno(p, pode) {
+    const grupos = agrupar(p, PREPARO, new Set()), prox = proximo(p), esp = esperas(p);
+    const it = A.itensAtivos(p), feitas = it.filter(x => x.i.estado === 'feita').length;
+    return `<article class="pc-cartao" aria-labelledby="pc-t-${p.id}">
+      <header class="pc-topo">${blocoData(p)}
+        <div class="pc-titulo"><h3 id="pc-t-${p.id}"><a href="#/processo/${p.id}">${A.esc(p.titulo)}</a></h3>
+          <p class="secundario">${[quandoTxt(p), p.horario, p.local, p.sei ? 'SEI ' + A.seiCurto(p.sei) : ''].filter(Boolean).map(A.esc).join(' · ')}</p></div>
+        ${p.arquivado ? '<span class="selo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">Arquivado</span>' : A.seloSit(A.situacao(p))}
+      </header>
+      ${prox ? `<p class="pc-prox"><span>Próximo passo</span> ${A.esc(prox.i.nome)}${prox.d ? ` <em class="${A.dias(prox.d) < 0 ? 'atrasou' : ''}">até ${A.fmt(prox.d)}</em>` : ''}</p>` : (it.length && feitas === it.length ? '<p class="pc-prox feito"><span>Tudo feito</span> Pode arquivar.</p>' : '')}
+      ${grupos.length ? `<div class="pc-etiquetas" role="list" aria-label="Preparação">${grupos.map(g => {
+        const k = p.id + '|' + g.nome, aberto = abrindo.has(k);
+        return `<span role="listitem"><button type="button" class="pc-et ${g.est}" data-et="${A.esc(k)}" aria-expanded="${aberto}" title="${A.esc(g.nome)}: ${ROT[g.est]}">${ic(g.est)}${A.esc(g.nome)}<span class="sr">: ${ROT[g.est]}</span>${g.itens.length > 1 ? ` <small>${g.itens.filter(i => i.estado === 'feita').length}/${g.itens.length}</small>` : ''}</button></span>`;
+      }).join('')}</div>` : ''}
+      ${grupos.filter(g => abrindo.has(p.id + '|' + g.nome)).map(g => `<div class="pc-itens"><p class="pc-itens-t">${A.esc(g.nome)}</p><ul>${g.itens.map(i => {
+        const d = A.prazo(p, i);
+        return `<li class="${i.estado}"><label><input type="checkbox" data-marca="${p.id}|${i.id}" ${i.estado === 'feita' ? 'checked' : ''} ${pode && i.quem !== 'acompanha' ? '' : 'disabled'}><span>${A.esc(i.nome)}</span></label><small>${i.estado === 'esperando' ? 'esperando resposta' : i.estado === 'feita' ? 'feito' + (i.feitoEm ? ' em ' + A.fmt(i.feitoEm) : '') : d ? 'até ' + A.fmt(d) : ''}${i.quem === 'acompanha' ? ' · acompanhar' : ''}</small></li>`;
+      }).join('')}</ul></div>`).join('')}
+      <footer class="pc-pe">
+        <div class="progresso"><div class="barra" aria-hidden="true"><i style="width:${it.length ? Math.round(feitas / it.length * 100) : 0}%"></i></div><span>${feitas}/${it.length} passos</span></div>
+        ${esp.length ? `<span class="pc-espera">${A.ic('relogio', 'ic-sm')} Esperando ${esp.join(', ')}</span>` : ''}
+      </footer>
+    </article>`;
+  }
+  function cartaoExterno(p) {
+    const etapas = agrupar(p, TRILHA, new Set()), esp = esperas(p);
+    return `<article class="pc-cartao pc-ext" aria-labelledby="pc-t-${p.id}">
+      <header class="pc-topo">${blocoData(p)}
+        <div class="pc-titulo"><h3 id="pc-t-${p.id}"><a href="#/processo/${p.id}">${A.esc(p.titulo)}</a></h3>
+          <p class="secundario">${[quandoTxt(p), p.unidade ? 'pedido de ' + p.unidade : '', p.publico ? 'para ' + (A.PUBLICOS[p.publico] || p.publico).toLowerCase() : '', p.sei ? 'SEI ' + A.seiCurto(p.sei) : ''].filter(Boolean).map(A.esc).join(' · ')}</p></div>
+        ${p.arquivado ? '<span class="selo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">Arquivado</span>' : ''}
+      </header>
+      ${etapas.length ? `<ol class="pc-trilha" aria-label="Andamento">${etapas.map(e => `<li class="${e.est}" title="${A.esc(e.itens.map(i => i.nome).join(' / '))}">${ic(e.est) || '<i aria-hidden="true"></i>'}<span>${A.esc(e.nome)}<span class="sr">: ${ROT[e.est]}</span></span></li>`).join('')}</ol>` : ''}
+      ${esp.length ? `<p class="pc-espera">${A.ic('relogio', 'ic-sm')} Esperando ${esp.join(', ')}</p>` : ''}
+    </article>`;
+  }
+  function visaoCartoes(lista, tipo, pode) {
+    if (!lista.length) return `<p class="vazio">${tipo === 'interno' ? 'Nenhum evento interno com esse filtro.' : 'Nenhum evento externo com esse filtro.'}</p>`;
+    return porTempo(lista).map(([t, l]) => `<section class="pc-grupo" aria-label="${t}"><h2 class="pc-grupo-t">${t} <span class="secundario">(${l.length})</span></h2>
+      <div class="pc-grade">${l.map(p => tipo === 'interno' ? cartaoInterno(p, pode) : cartaoExterno(p)).join('')}</div></section>`).join('');
+  }
 
   A.telaProcessos = (vista, novo) => {
     const pode = A.podeEditar(), regras = A.regras();
@@ -10,11 +117,17 @@
       .sort((a, b) => ordem === 'situacao' ? (A.PESO[A.situacao(b)] - A.PESO[A.situacao(a)] || ((A.dataRef(a) || '9') < (A.dataRef(b) || '9') ? -1 : 1))
         : ordem === 'data' ? ((A.dataRef(a) || '9') < (A.dataRef(b) || '9') ? -1 : 1) : a.titulo.localeCompare(b.titulo, 'pt-BR'));
     const nArq = todos.filter(p => p.arquivado).length;
+    const prefs = A.prefs(), conta = g => lista.filter(p => grupoDe(p) === g).length;
+    let aba = prefs.abaProcessos || (conta('interno') || !conta('externo') ? 'interno' : 'externo');
+    const daAba = aba === 'todos' ? lista : lista.filter(p => grupoDe(p) === aba);
     vista.innerHTML = `<main>
       <div class="cabeca"><div><h1>Processos</h1><p class="secundario" style="margin-top:6px">${todos.length - nArq} em andamento${nArq ? `, ${nArq} arquivado${nArq > 1 ? 's' : ''}` : ''}.</p></div>
         ${pode ? `<div class="cabeca-acoes"><div class="botoes">${A.semPlanilha() ? '' : `<a class="btn" href="#/planilha">${A.ic('atualizar')} Ler planilha</a>`}<button class="btn btn-primario" type="button" id="btnNovo" aria-expanded="${!!novo}" aria-controls="formNovo">${A.ic('mais')} Novo processo</button></div></div>` : ''}</div>
       <div id="formNovo"></div>
-      <div class="bloco" style="margin-top:24px">
+      <div class="pc-abas" role="tablist" aria-label="Tipo de processo">
+        ${ABAS.map(([v, n]) => `<button type="button" role="tab" class="pc-aba" data-aba="${v}" aria-selected="${aba === v}" tabindex="${aba === v ? 0 : -1}">${n} <span class="pc-conta">${v === 'todos' ? lista.length : conta(v)}</span></button>`).join('')}
+      </div>
+      <div class="bloco" style="margin-top:16px">
         <div class="bloco-topo" style="margin-bottom:12px">
           <div class="segmento" role="radiogroup" aria-label="Quais processos">
             ${[['ativos', 'Em andamento'], ['arquivados', 'Arquivados'], ['todos', 'Todos']].map(([v, n]) => `<label><input type="radio" name="filtro" value="${v}" ${filtro === v ? 'checked' : ''}><span>${n}</span></label>`).join('')}
@@ -24,9 +137,9 @@
             <label class="secundario" style="display:inline-flex;gap:6px;align-items:center">Ordenar por <select id="ordem" class="cel" style="width:auto;border-color:var(--linha)"><option value="situacao" ${ordem === 'situacao' ? 'selected' : ''}>situação</option><option value="data" ${ordem === 'data' ? 'selected' : ''}>data</option><option value="nome" ${ordem === 'nome' ? 'selected' : ''}>nome</option></select></label>
           </div>
         </div>
-        ${lista.length ? `<div class="tabela-rolagem"><table class="tabela" style="min-width:820px">
+        ${aba === 'interno' || aba === 'externo' ? visaoCartoes(daAba, aba, pode) : daAba.length ? `<div class="tabela-rolagem"><table class="tabela" style="min-width:820px">
           <thead><tr><th scope="col">Situação</th><th scope="col">Processo</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Andamento</th><th scope="col">${A.semPlanilha() ? 'Classificação' : 'Planilha'}</th>${pode ? '<th scope="col"><span class="sr">Apagar</span></th>' : ''}</tr></thead>
-          <tbody>${lista.map(p => {
+          <tbody>${daAba.map(p => {
             const s = A.situacao(p), it = A.itensAtivos(p), feitas = it.filter(x => x.i.estado === 'feita').length, m = A.mudancas(p).length, ref = A.dataRef(p);
             return `<tr class="clicavel" data-ir="${p.id}">
               <td style="width:130px">${p.arquivado ? `<span class="selo" style="--c:var(--neutro);--cbg:var(--neutro-bg)">Arquivado</span>` : A.seloSit(s)}</td>
@@ -36,9 +149,32 @@
               <td style="width:170px"><div class="progresso"><div class="barra" aria-hidden="true"><i style="width:${it.length ? Math.round(feitas / it.length * 100) : 0}%"></i></div><span>${feitas}/${it.length}</span></div></td>
               <td>${A.semPlanilha() ? (A.classeTexto(p) ? A.esc(A.classeTexto(p)) : '<span class="selo" style="--c:var(--atencao);--cbg:var(--atencao-bg)">Classificar</span>') : m ? `<span class="selo" style="--c:var(--ok);--cbg:var(--ok-bg)">${m} para atualizar</span>` : '<span class="secundario">em dia</span>'}</td>${pode ? `<td style="width:44px"><button type="button" class="btn-icone btn-apagar" data-apagar="${p.id}" aria-label="Apagar ${A.esc(p.titulo)}" title="Apagar processo">${A.ic('lixo')}</button></td>` : ''}</tr>`;
           }).join('')}</tbody></table></div>`
-          : `<p class="vazio">${todos.length ? 'Nenhum processo com esse filtro.' : (A.semPlanilha() ? 'Ainda não há processos. Crie o primeiro em "Novo processo".' : 'Ainda não há processos. Leia a planilha ou crie um processo novo.')}</p>`}
+          : `<p class="vazio">${todos.length ? (aba === 'outro' ? 'Nenhum processo de outro tipo com esse filtro.' : 'Nenhum processo com esse filtro.') : (A.semPlanilha() ? 'Ainda não há processos. Crie o primeiro em "Novo processo".' : 'Ainda não há processos. Leia a planilha ou crie um processo novo.')}</p>`}
       </div>
     </main>`;
+    const abas = [...vista.querySelectorAll('[data-aba]')];
+    abas.forEach((b, k) => {
+      b.onclick = () => { prefs.abaProcessos = b.dataset.aba; A.salvar(); A.mudar(A.redesenhar); };
+      b.onkeydown = e => {
+        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+        e.preventDefault(); const n = abas[(k + d + abas.length) % abas.length]; n.focus(); n.click();
+      };
+    });
+    vista.querySelectorAll('[data-et]').forEach(b => b.onclick = () => {
+      const k = b.dataset.et; abrindo.has(k) ? abrindo.delete(k) : abrindo.add(k);
+      A.comFoco(A.redesenhar);
+    });
+    vista.querySelectorAll('[data-marca]').forEach(cb => cb.onchange = () => {
+      const [pid, iid] = cb.dataset.marca.split('|'), proc = A.proc(pid), achado = proc && A.acharItem(proc, iid);
+      if (!achado) return;
+      const i = achado.i, feita = cb.checked, antes = [i.estado, i.feitoEm];
+      if (feita && i.depAut && A.semAutorizacao(proc) && !confirm(`Ainda não há autorização da PGJ registrada neste processo.\n\nMarcar "${i.nome}" como feito mesmo assim?`)) { cb.checked = false; return; }
+      i.estado = feita ? 'feita' : 'aberta'; i.feitoEm = feita ? A.hojeIso() : null;
+      A.anotar(proc, 'Passo', `${feita ? 'Feito' : 'Desmarcado'}: ${i.nome}.`);
+      proc.atualizadoEm = new Date().toISOString();
+      A.salvar(); A.comFoco(A.redesenhar);
+      A.avisar(feita ? `"${i.nome}" feito.` : `"${i.nome}" voltou a ficar aberto.`, () => { [i.estado, i.feitoEm] = antes; proc.diario.pop(); A.salvar(); A.redesenhar(); });
+    });
     vista.querySelectorAll('[name=filtro]').forEach(r => r.onchange = () => { filtro = r.value; A.mudar(A.redesenhar); });
     const bl = vista.querySelector('#buscaLista');
     bl.oninput = () => { busca = A.semAcento(bl.value); A.comFoco(A.redesenhar); const n = document.getElementById('buscaLista'); if (n) { n.setSelectionRange(n.value.length, n.value.length); } };
