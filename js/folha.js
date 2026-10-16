@@ -93,8 +93,9 @@
 
   /* ---------- estado da tela ---------- */
   let vista = 'mes', ref = HOJE, aberto = null, formando = null, soMeus = false, popDia = null;
-  try { const v = sessionStorage.getItem('folha-vista'); if (['ano', 'mes', 'semana', 'lista'].includes(v)) vista = v; } catch (e) {}
-  const visiveis = () => eventos.filter(e => !soMeus || meu(e));
+  let tipoFiltro = 'todos';
+  try { const v = sessionStorage.getItem('folha-vista'); if (['ano', 'mes', 'semana', 'lista'].includes(v)) vista = v; const f = sessionStorage.getItem('folha-tipo'); if (['todos', 'I', 'E'].includes(f)) tipoFiltro = f; } catch (e) {}
+  const visiveis = () => eventos.filter(e => (!soMeus || meu(e)) && (tipoFiltro === 'todos' || e.amb === tipoFiltro));
   const prazosDe = (a, b) => visiveis().flatMap(e => e.itens.filter(i => i.cal && i.prazo && !i.feito && i.prazo >= a && i.prazo <= b).map(i => ({ e, i })));
   const $ = s => document.querySelector(s);
   const folha = () => $('#folha'), lado = () => $('#lado');
@@ -116,7 +117,8 @@
   }
 
   const legenda = () => `<div class="legenda" aria-label="Legenda">${A.estado.perfis.slice().sort((a, b) => a.ini.localeCompare(b.ini)).map(p => `<span><i style="--pc:${p.cor || '#4F5B66'}"></i><b>${esc(p.ini)}</b></span>`).join('')}<span><b>I</b> interno · <b>E</b> externo</span><span><b>M</b> membros · <b>S</b> servidores · <b>MS</b> ambos</span></div>`;
-  const cabeca = (titulo, sub) => `<header class="folha-cab"><h1><small>${sub}</small>${titulo}</h1>${legenda()}</header>`;
+  const filtroTxt = () => [tipoFiltro === 'I' ? 'só eventos internos' : tipoFiltro === 'E' ? 'só eventos externos' : '', soMeus ? 'só os de ' + pessoa(eu()).ini : ''].filter(Boolean).join(' · ');
+  const cabeca = (titulo, sub) => `<header class="folha-cab"><h1><small>${sub}${filtroTxt() ? ' · ' + filtroTxt() : ''}</small>${titulo}</h1>${legenda()}</header>`;
   const rodape = () => `<p class="rodape-imp">Agenda da equipe · impressa em ${A.fmtAno(HOJE)}</p>`;
 
   /* ---------- mês ---------- */
@@ -283,7 +285,6 @@
         <datalist id="salas">${(A.salas ? A.salas() : []).map(s => `<option value="${esc(s)}">`).join('')}</datalist>
         <p class="erro" id="feErro" role="alert" hidden></p>
         <div class="acoes-aberto"><button type="submit" class="btn primario">Salvar evento</button><button type="button" class="btn" id="cancelar">Cancelar</button></div>
-        ${ed ? '' : '<p style="margin:0;font-size:13.5px;color:var(--tinta-2)">O checklist começa vazio. Depois de salvar, escreva os itens que este evento precisa.</p>'}
       </div></form>`;
     const f = lado().querySelector('#fEv'), sg = () => { f.querySelector('#feSig').textContent = `${f.amb.value} ${f.pub.value}`; };
     f.querySelectorAll('[name=amb],[name=pub]').forEach(r => r.onchange = sg);
@@ -298,7 +299,7 @@
       if (fim < ini) return falha('O fim não pode ser antes do início.', f.querySelector('#fFim'));
       aberto = salvarEvento({ titulo: t, amb: f.amb.value, pub: f.pub.value, ini, fim, hora: f.querySelector('#fHora').value.trim(), local: f.querySelector('#fLocal').value.trim() }, ed);
       ref = ini; formando = null; desenhar(); focar('#ab-t');
-      A.avisar(ed ? 'Evento salvo.' : 'Evento criado. Agora escreva o checklist.');
+      A.avisar(ed ? 'Evento salvo.' : 'Evento criado.');
     };
   }
 
@@ -379,6 +380,7 @@
     telaLado();
     $('#periodo').textContent = periodo().nome;
     document.querySelectorAll('[data-vista]').forEach(b => b.setAttribute('aria-pressed', b.dataset.vista === vista));
+    document.querySelectorAll('[data-tipo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tipo === tipoFiltro));
     document.title = `${periodo().nome} · Agenda da equipe`;
   }
   A.redesenhar = desenhar;
@@ -392,6 +394,7 @@
   document.addEventListener('click', ev => {
     const t = ev.target.closest('button, a'); if (!t) { if (popDia) { popDia = null; desenhar(); } return; }
     if (t.dataset.vista) { irPara(t.dataset.vista); return; }
+    if (t.dataset.tipo) { if (t.dataset.tipo !== tipoFiltro) transicao('suave', () => { tipoFiltro = t.dataset.tipo; try { sessionStorage.setItem('folha-tipo', tipoFiltro); } catch (e) {} }); return; }
     if (t.dataset.abrir) {
       popDia = null; formando = null; aberto = t.dataset.abrir;
       const e = eventos.find(x => x.id === aberto); if (e && vista !== 'ano' && !noPeriodo(e, periodo().a, periodo().b)) ref = e.ini;

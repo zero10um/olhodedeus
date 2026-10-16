@@ -304,3 +304,7 @@ html[data-vt=suave]::view-transition-old(*), html[data-vt=suave]::view-transitio
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: .16s !important; animation-name: vtSome; }
   ::view-transition-new(*) { animation-name: vtAparece; }
 }
+
+/* filtro Todos · Internos · Externos */
+.filtro-tipo button { font-size: 12.5px; padding: 7px 11px; }
+@media (max-width: 640px) { .filtro-tipo { width: 100%; } .filtro-tipo button { flex: 1; } }
