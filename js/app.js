@@ -13,7 +13,7 @@
     el.innerHTML = `<a class="marca" href="#/painel">Meus processos</a>
       ${pagina === 'painel' || supa ? `<div class="busca" role="search">${A.ic('busca')}<label class="sr" for="buscaTopo">${supa ? 'Buscar curso ou número SEI na equipe toda' : 'Buscar curso ou número SEI'}</label><input id="buscaTopo" type="search" placeholder="${supa ? 'Buscar SEI ou curso na equipe' : 'Buscar curso ou SEI'}" autocomplete="off" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" hidden></div></div>` : '<span style="margin-left:auto"></span>'}
       ${A.modo === 'nuvem' ? '<span class="status-nuvem" id="statusNuvem" role="status" aria-live="polite"></span>' : ''}
-      <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}${supa && A.nuvem.admin ? link('equipe', 'Equipe', pagina === 'equipe') : ''}</nav>
+      <nav class="menu" aria-label="Principal">${link('painel', 'Painel', pagina === 'painel')}${link('processos', 'Processos', pagina === 'processos' || pagina === 'processo')}${link('agenda', 'Agenda da equipe', pagina === 'agenda')}${link('regras', 'Regras de prazo', pagina === 'regras')}${supa ? link('relatorio', 'Relatório', pagina === 'relatorio') : link('planilha', 'Planilha', pagina === 'planilha')}${supa && A.nuvem.admin ? link('equipe', 'Equipe', pagina === 'equipe') : ''}${!supa || A.nuvem.admin ? '<a href="agenda.html">Agenda nova</a>' : ''}</nav>
       ${A.botaoAvisos()}
       <div class="perfil"><button type="button" class="perfil-btn" aria-haspopup="menu" aria-expanded="false" id="perfilBtn">${A.avatar(dono)}<span>${A.esc(dono.ini)}</span>${A.ic('seta')}<span class="sr">, ${modoTxt}. Abrir menu do perfil</span></button>
         <div class="menu-flutuante" role="menu" hidden>
@@ -125,6 +125,8 @@
       if (pagina !== 'entrar') { location.replace('#/entrar'); return; }
     }
     if (pagina === 'entrar' && A.sessao && A.dono() && !A.estado.perfis.length) A.sair();
+    // Na versão da equipe, o sistema anterior é só da administração: os demais usam a agenda nova
+    if (A.semPlanilha() && !A.nuvem.admin && A.sessao && A.dono() && !['entrar', 'perfil'].includes(pagina)) { location.replace('agenda.html'); return; }
     topo(r);
     const ls = document.getElementById('lista-salas');
     if (ls && A.estado) ls.innerHTML = A.salas().map(s => `<option value="${A.esc(s)}">`).join('');

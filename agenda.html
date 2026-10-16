@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda da equipe</title>
+<link rel="stylesheet" href="css/folha.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-esq" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-dir" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-imp" viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 17H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-3M7 14h10v7H7z"/></symbol>
+  <symbol id="i-lixo" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+<div class="moldura">
+  <header class="trilho">
+    <div class="placa"><b>Agenda da equipe</b><span>Setor pedagógico · EMPRO</span></div>
+    <div class="conta"><span class="status" id="status" role="status"></span><span class="eu" id="eu" aria-label="Suas iniciais"></span><a href="index.html#/perfil" id="trocarSenha">Trocar senha</a><a href="index.html#/painel" id="sistemaAnterior" hidden>Sistema anterior</a><button type="button" id="sair">Sair</button></div>
+  </header>
+  <nav class="bandeja" aria-label="Calendário">
+    <div class="vistas" role="group" aria-label="Visão">
+      <button type="button" data-vista="ano">Ano</button><button type="button" data-vista="mes">Mês</button><button type="button" data-vista="semana">Semana</button><button type="button" data-vista="lista">Lista</button>
+    </div>
+    <div class="nav"><button type="button" id="ant" aria-label="Período anterior"><svg class="ic"><use href="#i-esq"/></svg></button><button type="button" class="hoje-btn" id="hoje">Hoje</button><button type="button" id="prox" aria-label="Próximo período"><svg class="ic"><use href="#i-dir"/></svg></button></div>
+    <span class="periodo" id="periodo"></span>
+    <div class="dir">
+      <label class="so-meus"><input type="checkbox" id="soMeus"> Só os meus</label>
+      <button type="button" class="btn" id="imprimir"><svg class="ic"><use href="#i-imp"/></svg> Imprimir</button>
+      <button type="button" class="btn primario" id="novo"><svg class="ic"><use href="#i-mais"/></svg> Novo evento</button>
+    </div>
+  </nav>
+  <main class="cortica" id="cortica">
+    <section class="papel folha" id="folha" aria-live="polite"></section>
+    <aside class="mural-lado" id="lado" aria-label="Eventos"></aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button type="button" id="toastDesfazer" hidden>Desfazer</button></div>
+<script src="lib/supabase.js"></script>
+<script src="js/util.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/regras.js"></script>
+<script src="js/supabase-db.js"></script>
+<script src="js/nuvem.js"></script>
+<script src="js/folha.js"></script>
+</body>
+</html>

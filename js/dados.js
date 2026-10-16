@@ -202,6 +202,7 @@
 
   /* Prazo de um passo: conta a partir da data de referência */
   A.prazo = (proc, item) => {
+    if (item.prazoFixo) return item.prazoFixo; // item escrito à mão na agenda nova, com data escolhida
     const r = item.regra || {};
     if (r.semPrazo) return null;
     const base = r.ref === 'fim' ? (proc.fim || proc.inicio) : r.ref === 'limite' ? (proc.limite || proc.inicio) : r.ref === 'entrada' ? proc.entrada : (proc.inicio || proc.limite);
@@ -282,7 +283,7 @@
   A.situacao = proc => {
     const lim = A.regras(proc.dono).limites;
     const pend = A.itensAtivos(proc).filter(x => x.i.estado !== 'feita');
-    if (!pend.length) return 'ok';
+    if (!pend.length) return A.itensAtivos(proc).length ? 'ok' : (A.dataRef(proc) ? 'emdia' : 'semdata'); // checklist vazio não é "tudo feito"
     // evento externo: a escola só encaminha; não acende vermelho nem amarelo
     if (proc.ambito === 'externo') return A.dataRef(proc) ? 'emdia' : 'semdata';
     const ref = A.dataRef(proc);

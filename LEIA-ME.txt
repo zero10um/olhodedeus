@@ -29,6 +29,12 @@ B) SEM INTERNET (esta pasta)
 
 No dia a dia
 ------------
+- AGENDA DA EQUIPE (sistema novo, agenda.html): a tela é a folha do calendário.
+  Cada evento: nome, I/E (interno ou externo), M/S/MS (membros, servidores, os dois),
+  datas, horário (opcional) e local. O checklist começa vazio: você escreve os itens;
+  cada item pode ter prazo e aparecer no calendário. Ano, Mês, Semana e Lista, e
+  "Imprimir" tira a folha da visão aberta. Na versão da equipe, quem não é da
+  administração entra direto nela; o sistema anterior fica para a administração.
 - Painel: o que fazer hoje, o que está atrasado e o que espera resposta.
 - Processos: cadastre cada processo. Cole o número SEI inteiro: o sistema guarda só
   os últimos 11 dígitos. Ele avisa se o SEI já foi cadastrado por alguém.
