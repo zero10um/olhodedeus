@@ -136,7 +136,7 @@
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) {
       const lanes = faixas(ws, visiveis());
-      html += `<div class="semana">`;
+      html += `<div class="semana" data-ws="${ws}">`;
       for (let k = 0; k < 7; k++) {
         const d = soma(ws, k), pz = prazosDe(d, d), extra = lanes.slice(MAX).filter(ln => ln.some(s => s.c0 <= k && s.c1 >= k)).length;
         html += `<div class="cel${d.slice(0, 7) !== p.a.slice(0, 7) ? ' fora' : ''}${k > 4 ? ' fds' : ''}${d === HOJE ? ' hoje' : ''}" style="grid-column:${k + 1}">
@@ -177,7 +177,7 @@
     let html = cabeca(String(a), 'O ano da escola') + `<div class="ano">`;
     for (let m = 0; m < 12; m++) {
       const p1 = `${a}-${pad(m + 1)}-01`, ult = iso(new Date(a, m + 1, 0));
-      html += `<section class="mini"><h2><button type="button" data-mes="${p1}">${MESES[m]}</button></h2><div class="mini-grade">${SEM.map(s => `<span class="d cab">${s[0].toUpperCase()}</span>`).join('')}`;
+      html += `<section class="mini" data-ym="${p1.slice(0, 7)}"><h2><button type="button" data-mes="${p1}">${MESES[m]}</button></h2><div class="mini-grade">${SEM.map(s => `<span class="d cab">${s[0].toUpperCase()}</span>`).join('')}`;
       for (let d = seg(p1); d <= ult || dt(d).getDay() !== 1; d = soma(d, 1)) {
         if (d > ult && dt(d).getDay() === 1) break;
         const dentro = d >= p1 && d <= ult, evs = dentro ? lista.filter(e => e.ini <= d && e.fim >= d) : [];
@@ -302,6 +302,74 @@
     };
   }
 
+  /* ---------- transições entre as visões ----------
+     A hierarquia Ano > Mês > Semana vira zoom: a parte do calendário que você escolheu cresce até
+     virar a folha inteira (e encolhe de volta). ‹ › viram a página para o lado. A Lista entra como
+     página nova. Quem pede menos movimento no sistema recebe só um esmaecer. */
+  const NIVEL = { ano: 0, mes: 1, semana: 2 };
+  const reduzir = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ancoraAno = () => folha().querySelector(`.mini[data-ym="${ref.slice(0, 7)}"]`);
+  const ancoraSemana = () => folha().querySelector(`.semana[data-ws="${seg(ref)}"]`) || folha().querySelector('.semana');
+  function ancoraDe(nivelDe, nivelPara) { // a parte da visão mais ampla que corresponde à mais detalhada
+    const amplo = Math.min(nivelDe, nivelPara);
+    return amplo === 0 ? ancoraAno() : ancoraSemana();
+  }
+  let emCurso = null;
+  function transicao(tipo, mudar) {
+    const html = document.documentElement, f = folha();
+    if (emCurso) { try { emCurso.skipTransition(); } catch (e) {} }
+    if (!document.startViewTransition) {
+      mudar(); desenhar();
+      if (!reduzir()) f.animate([{ opacity: 0, transform: tipo === 'ant' ? 'translateX(-24px)' : tipo === 'prox' ? 'translateX(24px)' : 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.16,1,.3,1)' });
+      return;
+    }
+    const suave = reduzir();
+    html.dataset.vt = suave ? 'suave' : tipo === 'mais' ? 'zoom-in' : tipo === 'menos' ? 'zoom-out' : tipo;
+    let antes = null;
+    const de = NIVEL[vista];
+    if (!suave && (tipo === 'mais' || tipo === 'menos')) {
+      // ao aproximar, a âncora está na visão atual (mais ampla); ao afastar, é a folha inteira
+      antes = tipo === 'mais' ? (zoomAlvo || null) : f;
+      if (antes) { f.style.viewTransitionName = antes === f ? 'zoom' : 'none'; if (antes !== f) antes.style.viewTransitionName = 'zoom'; }
+    }
+    emCurso = document.startViewTransition(() => {
+      if (antes && antes !== f) antes.style.viewTransitionName = '';
+      mudar(); desenhar();
+      if (antes) {
+        const para = NIVEL[vista];
+        const depois = tipo === 'mais' ? f : ancoraDe(de, para);
+        f.style.viewTransitionName = depois === f ? 'zoom' : 'none';
+        if (depois && depois !== f) depois.style.viewTransitionName = 'zoom';
+      }
+    });
+    zoomAlvo = null;
+    emCurso.finished.finally(() => {
+      delete html.dataset.vt; emCurso = null;
+      folha().style.viewTransitionName = '';
+      folha().querySelectorAll('.mini, .semana').forEach(el => { el.style.viewTransitionName = ''; });
+    });
+  }
+  let zoomAlvo = null;
+  function irPara(nova, novaRef, alvo) {
+    const de = vista;
+    if (nova === de && (!novaRef || novaRef === ref)) return;
+    let tipo;
+    if (nova === 'lista' || de === 'lista') tipo = 'pagina';
+    else if (nova === de) tipo = novaRef > ref ? 'prox' : 'ant';
+    else tipo = NIVEL[nova] > NIVEL[de] ? 'mais' : 'menos';
+    if (tipo === 'mais') zoomAlvo = alvo || (NIVEL[de] === 0 ? (() => { const r0 = ref; ref = novaRef || ref; const a = ancoraAno(); ref = r0; return a; })() : (() => { const r0 = ref; ref = novaRef || ref; const a = ancoraSemana(); ref = r0; return a; })());
+    transicao(tipo, () => { vista = nova; if (novaRef) ref = novaRef; popDia = null; try { sessionStorage.setItem('folha-vista', vista); } catch (e) {} });
+  }
+  function andarAnimado(n) {
+    transicao(n > 0 ? 'prox' : 'ant', () => {
+      const d = dt(ref);
+      if (vista === 'ano') d.setFullYear(d.getFullYear() + n);
+      else if (vista === 'semana') d.setDate(d.getDate() + 7 * n);
+      else { d.setDate(1); d.setMonth(d.getMonth() + n); }
+      ref = iso(d); popDia = null;
+    });
+  }
+
   /* ---------- desenho ---------- */
   const focar = s => requestAnimationFrame(() => { const el = document.querySelector(s); if (el) el.focus({ preventScroll: innerWidth > 1020 }); });
   function desenhar() {
@@ -323,15 +391,15 @@
 
   document.addEventListener('click', ev => {
     const t = ev.target.closest('button, a'); if (!t) { if (popDia) { popDia = null; desenhar(); } return; }
-    if (t.dataset.vista) { vista = t.dataset.vista; popDia = null; try { sessionStorage.setItem('folha-vista', vista); } catch (e) {} desenhar(); return; }
+    if (t.dataset.vista) { irPara(t.dataset.vista); return; }
     if (t.dataset.abrir) {
       popDia = null; formando = null; aberto = t.dataset.abrir;
       const e = eventos.find(x => x.id === aberto); if (e && vista !== 'ano' && !noPeriodo(e, periodo().a, periodo().b)) ref = e.ini;
       desenhar(); focar('#ab-t'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
     }
     if (t.dataset.dia) { popDia = popDia === t.dataset.dia ? null : t.dataset.dia; desenhar(); return; }
-    if (t.dataset.mes) { ref = t.dataset.mes; vista = 'mes'; desenhar(); return; }
-    if (t.dataset.semana) { ref = t.dataset.semana; vista = 'semana'; desenhar(); return; }
+    if (t.dataset.mes) { irPara('mes', t.dataset.mes, t.closest('.mini')); return; }
+    if (t.dataset.semana) { irPara('semana', t.dataset.semana, t.closest('.semana')); return; }
     if (t.dataset.picote) {
       const e = eventos.find(x => x.id === aberto); if (!e || !pode(e)) return;
       marcar(e, t.dataset.picote); desenhar();
@@ -340,9 +408,9 @@
     }
     if (t.dataset.tirar) { const e = eventos.find(x => x.id === aberto); if (e && pode(e)) { tirar(e, t.dataset.tirar); desenhar(); } return; }
     switch (t.id) {
-      case 'ant': andar(-1); break;
-      case 'prox': andar(1); break;
-      case 'hoje': ref = HOJE; desenhar(); break;
+      case 'ant': andarAnimado(-1); break;
+      case 'prox': andarAnimado(1); break;
+      case 'hoje': { const p0 = periodo(); if (HOJE >= p0.a && HOJE <= p0.b) break; transicao(HOJE > ref ? 'prox' : 'ant', () => { ref = HOJE; popDia = null; }); break; }
       case 'novo': aberto = null; formando = 'novo'; desenhar(); focar('#fTit'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth' }); break;
       case 'fechar': { const id = aberto; aberto = null; desenhar(); requestAnimationFrame(() => { const b = lado().querySelector(`[data-abrir="${id}"]`); if (b) b.focus(); }); break; }
       case 'editar': formando = aberto; desenhar(); focar('#fTit'); break;
@@ -356,6 +424,10 @@
       case 'imprimir': imprimir(); break;
       case 'sair': if (A.supa && A.modo === 'nuvem') A.supa.sairDaConta(); else { A.sair(); location.href = 'index.html'; } break;
     }
+  });
+  document.addEventListener('keydown', ev => {
+    const el = document.activeElement, digitando = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+    if (!digitando && !ev.altKey && !ev.ctrlKey && !ev.metaKey && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && !(el && el.closest('.vistas'))) { ev.preventDefault(); andarAnimado(ev.key === 'ArrowRight' ? 1 : -1); return; }
   });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (popDia) { popDia = null; desenhar(); } else if (aberto || formando) { aberto = null; formando = null; desenhar(); } } });
   function imprimir() {
@@ -372,7 +444,7 @@
     $('#eu').textContent = me.ini; $('#eu').style.setProperty('--eu', me.cor);
     $('#sistemaAnterior').hidden = !(admin() || A.modo !== 'nuvem');
     $('#trocarSenha').hidden = A.modo !== 'nuvem';
-    $('#soMeus').onchange = ev => { soMeus = ev.target.checked; desenhar(); };
+    $('#soMeus').onchange = ev => transicao('suave', () => { soMeus = ev.target.checked; });
   }
   async function iniciar() {
     A.ligarAviso();
