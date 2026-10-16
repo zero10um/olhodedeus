@@ -391,3 +391,22 @@ html[data-vt=suave]::view-transition-old(*), html[data-vt=suave]::view-transitio
 .oculto-tag { position: absolute; right: 12px; bottom: 10px; font-size: 11px; font-weight: 800; font-stretch: 85%; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta); }
 @media print { .ocultar { display: none; } }
 .oculto-tag { pointer-events: none; background: var(--mesa); padding: 1px 5px; z-index: 2; }
+
+/* dias separados: seletor no formulário */
+.secundario { color: var(--tinta-2); font-size: 13px; }
+.seletor-dias { border: 1px solid var(--fio); padding: 8px; max-width: 340px; background: #fff; }
+.sd-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.sd-topo b { font-size: 15px; font-weight: 800; font-stretch: 85%; text-transform: capitalize; }
+.sd-nav { min-width: 36px; min-height: 36px; border: 1px solid var(--fio); background: #fff; display: inline-grid; place-items: center; cursor: pointer; }
+.sd-nav:hover { border-color: var(--tinta); }
+.sd-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.sd-cab { font-size: 11px; font-weight: 700; text-align: center; color: var(--tinta-2); padding: 2px 0; }
+.sd-dia { min-height: 36px; border: 1px solid transparent; background: #fff; cursor: pointer; font-weight: 700; font-size: 14px; }
+.sd-dia:hover { border-color: var(--tinta); }
+.sd-dia.hoje { box-shadow: inset 0 -3px 0 var(--hoje); }
+.sd-dia[aria-pressed="true"] { background: var(--tinta); color: #fff; }
+.dias-escolhidos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; align-items: center; }
+.dia-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 2px 6px 2px 9px; border: 1px solid var(--fio); background: #fff; cursor: pointer; font-weight: 700; font-size: 13px; }
+.dia-chip:hover { border-color: var(--carbono); }
+.dia-chip svg { width: 14px; height: 14px; }
+[hidden] { display: none !important; }
