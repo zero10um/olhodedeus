@@ -15,6 +15,7 @@
   <symbol id="i-lixo" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-menos" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
 </svg>
 <div class="moldura">
   <header class="trilho">
@@ -28,6 +29,7 @@
     <div class="nav"><button type="button" id="ant" aria-label="Período anterior"><svg class="ic"><use href="#i-esq"/></svg></button><button type="button" class="hoje-btn" id="hoje">Hoje</button><button type="button" id="prox" aria-label="Próximo período"><svg class="ic"><use href="#i-dir"/></svg></button></div>
     <span class="periodo" id="periodo"></span>
     <div class="dir">
+      <div class="vistas modo-mes" role="group" aria-label="Como ver o mês"><button type="button" data-modo="faixas">Faixas</button><button type="button" data-modo="dia">Por dia</button></div>
       <div class="vistas filtro-tipo" role="group" aria-label="Quais eventos"><button type="button" data-tipo="todos">Todos</button><button type="button" data-tipo="I">Internos</button><button type="button" data-tipo="E">Externos</button></div>
       <label class="so-meus"><input type="checkbox" id="soMeus"> Só os meus</label>
       <button type="button" class="btn" id="imprimir"><svg class="ic"><use href="#i-imp"/></svg> Imprimir</button>

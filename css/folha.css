@@ -362,3 +362,32 @@ html[data-vt=suave]::view-transition-old(*), html[data-vt=suave]::view-transitio
 @media (min-width: 1021px) { .folha-cab { min-height: 0; padding-bottom: 6px; } .folha-cab h1 { font-size: 30px; } .dias-sem span { padding: 6px 6px 4px; } }
 @media (max-width: 640px) { .cel-extra { top: 2px; right: 1px; gap: 2px; } .semana .mais { min-height: 18px; font-size: 10px; padding: 0 3px; } }
 @media print { .semana .mais { border: 0; padding: 0; } }
+
+/* mês "por dia": cada quadradinho lista os eventos daquele dia */
+.semana-dia { grid-template-rows: 100%; }
+@media (max-width: 1020px) { .semana-dia { min-height: 110px; } }
+.semana-dia .cel { grid-row: 1; display: flex; flex-direction: column; overflow: hidden; background: none; }
+.semana-dia .cel.fds { background: var(--fds); }
+.dia-lista { display: grid; gap: 2px; margin-top: 4px; min-width: 0; }
+.barra-dia { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 24px; padding: 0 4px; border: 1px solid color-mix(in srgb, var(--pc) 55%, #fff); background: #fff; cursor: pointer; text-align: left; font-size: 11.5px; font-weight: 650; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+.barra-dia:hover { border-color: var(--pc); }
+.barra-dia .sig { flex: none; padding: 0 3px; font-weight: 800; font-stretch: 85%; background: color-mix(in srgb, var(--pc) 28%, #fff); border-radius: 1px 5px 2px 4px; }
+.barra-dia .t { overflow: hidden; text-overflow: ellipsis; }
+.barra-dia.feito .t { text-decoration: line-through; color: var(--tinta-2); }
+.modo-mes[hidden] { display: none; }
+.modo-mes button { font-size: 12.5px; padding: 7px 11px; }
+@media print { .semana-dia { min-height: 0; } .barra-dia { min-height: 16px; font-size: 9.5px; } }
+@media (max-width: 640px) { .barra-dia { min-height: 17px; font-size: 9.5px; padding: 0 2px; } .barra-dia .t { display: none; } }
+
+/* ocultar do calendário (só para quem escondeu) */
+.ficha-w { position: relative; }
+.ficha-w .bilhete { padding-right: 0; }
+.ficha-w .canhoto { padding-right: 46px; }
+.ocultar { position: absolute; top: 6px; right: 6px; z-index: 2; width: 32px; height: 32px; display: inline-grid; place-items: center; background: #fff; border: 1px solid var(--fio); cursor: pointer; color: var(--tinta); }
+.ocultar:hover { border-color: var(--tinta); }
+.ocultar svg { width: 16px; height: 16px; }
+.ficha-w.oculto .bilhete { opacity: .42; filter: grayscale(1); border-style: dashed; transition: opacity .25s, filter .25s; }
+.ficha-w.oculto .bilhete:hover { opacity: .7; }
+.oculto-tag { position: absolute; right: 12px; bottom: 10px; font-size: 11px; font-weight: 800; font-stretch: 85%; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta); }
+@media print { .ocultar { display: none; } }
+.oculto-tag { pointer-events: none; background: var(--mesa); padding: 1px 5px; z-index: 2; }

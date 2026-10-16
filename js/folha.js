@@ -95,7 +95,19 @@
   let vista = 'mes', ref = HOJE, aberto = null, formando = null, soMeus = false, popDia = null;
   let tipoFiltro = 'todos';
   try { const v = sessionStorage.getItem('folha-vista'); if (['ano', 'mes', 'semana', 'lista'].includes(v)) vista = v; const f = sessionStorage.getItem('folha-tipo'); if (['todos', 'I', 'E'].includes(f)) tipoFiltro = f; } catch (e) {}
-  const visiveis = () => eventos.filter(e => (!soMeus || meu(e)) && (tipoFiltro === 'todos' || e.amb === tipoFiltro));
+  // o que cada pessoa esconde do calendário e o jeito de ver o mês ficam nas preferências dela (os colegas não são afetados)
+  const prefs = () => (A.prefs ? A.prefs() : {});
+  const ocultos = () => { const p = prefs(); return Array.isArray(p.agendaOcultos) ? p.agendaOcultos : []; };
+  const oculto = e => ocultos().includes(e.id);
+  const modoMes = () => prefs().agendaModoMes === 'dia' ? 'dia' : 'faixas';
+  const filtrados = () => eventos.filter(e => (!soMeus || meu(e)) && (tipoFiltro === 'todos' || e.amb === tipoFiltro));
+  const visiveis = () => filtrados().filter(e => !oculto(e));
+  function alternarOculto(id) {
+    const p = prefs(), l = ocultos().slice(), k = l.indexOf(id);
+    if (k >= 0) l.splice(k, 1); else l.push(id);
+    p.agendaOcultos = l.filter(x => eventos.some(e => e.id === x));
+    A.salvar();
+  }
   const prazosDe = (a, b) => visiveis().flatMap(e => e.itens.filter(i => i.cal && i.prazo && !i.feito && i.prazo >= a && i.prazo <= b).map(i => ({ e, i })));
   const $ = s => document.querySelector(s);
   const folha = () => $('#folha'), lado = () => $('#lado');
@@ -117,7 +129,7 @@
   }
 
   const legenda = () => `<div class="legenda" aria-label="Legenda">${A.estado.perfis.slice().sort((a, b) => a.ini.localeCompare(b.ini)).map(p => `<span><i style="--pc:${p.cor || '#4F5B66'}"></i><b>${esc(p.ini)}</b></span>`).join('')}<span><b>I</b> interno · <b>E</b> externo</span><span><b>M</b> membros · <b>S</b> servidores · <b>MS</b> ambos</span></div>`;
-  const filtroTxt = () => [tipoFiltro === 'I' ? 'só eventos internos' : tipoFiltro === 'E' ? 'só eventos externos' : '', soMeus ? 'só os de ' + pessoa(eu()).ini : ''].filter(Boolean).join(' · ');
+  const filtroTxt = () => [tipoFiltro === 'I' ? 'só eventos internos' : tipoFiltro === 'E' ? 'só eventos externos' : '', (() => { const n = filtrados().filter(oculto).length; return n ? `${n} oculto${n > 1 ? 's' : ''}` : ''; })(), soMeus ? 'só os de ' + pessoa(eu()).ini : ''].filter(Boolean).join(' · ');
   const cabeca = (titulo, sub) => `<header class="folha-cab"><h1><small>${sub}${filtroTxt() ? ' · ' + filtroTxt() : ''}</small>${titulo}</h1>${legenda()}</header>`;
   const rodape = () => `<p class="rodape-imp">Agenda da equipe · impressa em ${A.fmtAno(HOJE)}</p>`;
 
@@ -145,7 +157,37 @@
     const altura = Math.max(imprimindo ? 70 : 72, Math.floor(util / semanas));
     return { ...m, altura, linhas: 0 };
   }
+  function telaMesDia() {
+    const p = periodo(), sems = [];
+    for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
+    const md = medidasMes(sems.length), lista = visiveis().slice().sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
+    const chip = imprimindo ? 18 : 26;
+    let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
+    html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
+    sems.forEach(ws => {
+      const cabe = md.altura ? Math.max(1, Math.floor((md.altura - md.num - 4) / chip)) : 4;
+      html += `<div class="semana semana-dia" data-ws="${ws}" style="${md.altura ? `height:${md.altura}px` : ''}">`;
+      for (let k = 0; k < 7; k++) {
+        const d = soma(ws, k), pz = prazosDe(d, d), doDia = lista.filter(e => e.ini <= d && e.fim >= d);
+        const mostra = doDia.slice(0, cabe), extra = doDia.length - mostra.length; // o +N fica na linha do número, não ocupa lugar
+        html += `<div class="cel${d.slice(0, 7) !== p.a.slice(0, 7) ? ' fora' : ''}${k > 4 ? ' fds' : ''}${d === HOJE ? ' hoje' : ''}" style="grid-column:${k + 1}">
+          <span class="num"${d === HOJE ? ' aria-label="hoje"' : ''}>${dt(d).getDate()}</span>
+          <span class="cel-extra">${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
+            ${popDia === d ? `<div class="prazo-pop">${pz.map(({ e, i }) => `<button type="button" data-abrir="${e.id}"><b>${esc(i.txt)}</b><small>${sig(e)} · ${esc(e.titulo)}</small></button>`).join('')}</div>` : ''}</span>` : ''}
+          ${extra ? `<button type="button" class="mais" data-semana="${ws}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''}: ver a semana">+${extra}</button>` : ''}</span>
+          <span class="dia-lista">${mostra.map(e => `<button type="button" class="barra-dia${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)}" data-abrir="${e.id}" title="${esc(`${sig(e)} – ${e.titulo} (${intervalo(e)})`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`).join('')}</span>
+        </div>`;
+      }
+      html += `</div>`;
+    });
+    folha().innerHTML = html + rodape();
+    if (md.altura && !imprimindo && !telaMesDia.ajustando) {
+      const f = folha(), sobra = f.scrollHeight - f.clientHeight;
+      if (sobra > 0 || sobra < -8) { corrMes = Math.max(-200, corrMes + sobra + 2); telaMesDia.ajustando = true; telaMesDia(); telaMesDia.ajustando = false; }
+    }
+  }
   function telaMes() {
+    if (modoMes() === 'dia') return telaMesDia();
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
     const md = medidasMes(sems.length), lista = visiveis();
@@ -236,18 +278,19 @@
   /* ---------- coluna: fichas, evento aberto, formulário ---------- */
   function ficha(e) {
     const f = e.itens.filter(i => i.feito).length;
-    return `<button type="button" class="papel bilhete" style="--pc:${pc(e)}" data-abrir="${e.id}">
+    const oc = oculto(e);
+    return `<div class="ficha-w${oc ? ' oculto' : ''}"><button type="button" class="papel bilhete" style="--pc:${pc(e)}" data-abrir="${e.id}">
       <span class="canhoto"><span class="sig grifo">${sig(e)}</span><span class="quando">${intervalo(e)}</span></span>
       <span class="bilhete-corpo"><b>${esc(e.titulo)}</b><span class="linha">${[e.local, e.hora].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join('')}<span class="ini">${esc(pessoa(e.dono).ini)}</span></span>
         <span class="progresso-picote">${e.itens.length ? `<span class="furos" aria-hidden="true">${e.itens.slice(0, 24).map(i => `<i class="${i.feito ? 'f' : ''}"></i>`).join('')}</span>${f} de ${e.itens.length}` : 'checklist vazio'}</span></span>
       ${feitoTudo(e) ? '<span class="carimbo">Concluído</span>' : ''}
-    </button>`;
+    </button>${oc ? '<span class="oculto-tag">fora do calendário</span>' : ''}<button type="button" class="ocultar" data-ocultar="${e.id}" aria-pressed="${oc}" aria-label="${oc ? 'Mostrar' : 'Ocultar'} ${esc(e.titulo)} ${oc ? 'no' : 'do'} calendário" title="${oc ? 'Mostrar no calendário' : 'Ocultar do calendário'}">${ic(oc ? 'mais' : 'menos')}</button></div>`;
   }
   function telaLado() {
     if (formando) return formulario();
     if (aberto) { const e = eventos.find(x => x.id === aberto); if (e) return eventoAberto(e); aberto = null; }
     const p = periodo();
-    const lista = (vista === 'ano' ? visiveis().filter(e => e.fim >= HOJE) : visiveis().filter(e => noPeriodo(e, p.a, p.b)))
+    const lista = (vista === 'ano' ? filtrados().filter(e => e.fim >= HOJE) : filtrados().filter(e => noPeriodo(e, p.a, p.b)))
       .sort((x, y) => x.ini.localeCompare(y.ini)).slice(0, vista === 'ano' ? 8 : 60);
     lado().innerHTML = `<h2 class="lado-t">${vista === 'ano' ? 'Próximos eventos' : 'Eventos do período'}</h2>` + (lista.map(ficha).join('') || `<div class="papel bilhete-corpo" style="padding:18px"><b>Nenhum evento neste período.</b><span class="linha">Use "Novo evento" para cadastrar.</span></div>`);
   }
@@ -410,6 +453,8 @@
     $('#periodo').textContent = periodo().nome;
     document.querySelectorAll('[data-vista]').forEach(b => b.setAttribute('aria-pressed', b.dataset.vista === vista));
     document.querySelectorAll('[data-tipo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tipo === tipoFiltro));
+    document.querySelectorAll('[data-modo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.modo === modoMes()));
+    const mm = document.querySelector('.modo-mes'); if (mm) mm.hidden = vista !== 'mes';
     document.title = `${periodo().nome} · Agenda da equipe`;
   }
   A.redesenhar = desenhar;
@@ -423,6 +468,8 @@
   document.addEventListener('click', ev => {
     const t = ev.target.closest('button, a'); if (!t) { if (popDia) { popDia = null; desenhar(); } return; }
     if (t.dataset.vista) { irPara(t.dataset.vista); return; }
+    if (t.dataset.ocultar) { const id = t.dataset.ocultar; transicao('suave', () => alternarOculto(id)); requestAnimationFrame(() => { const b = lado().querySelector(`[data-ocultar="${id}"]`); if (b) b.focus(); }); return; }
+    if (t.dataset.modo) { if (t.dataset.modo !== modoMes()) transicao('suave', () => { prefs().agendaModoMes = t.dataset.modo; A.salvar(); }); return; }
     if (t.dataset.tipo) { if (t.dataset.tipo !== tipoFiltro) transicao('suave', () => { tipoFiltro = t.dataset.tipo; try { sessionStorage.setItem('folha-tipo', tipoFiltro); } catch (e) {} }); return; }
     if (t.dataset.abrir) {
       popDia = null; formando = null; aberto = t.dataset.abrir;
