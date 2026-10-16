@@ -132,28 +132,57 @@
     });
     return lanes;
   }
+  /* O mês cabe inteiro na tela (e numa folha A4 deitada ao imprimir): a altura de cada semana é
+     calculada pelo espaço que sobra. Eventos de 7 dias ou mais viram uma faixa fina no alto da semana,
+     para não roubar as linhas dos eventos curtos. */
+  const LONGO = 7;
+  let imprimindo = false, corrMes = 0;
+  function medidasMes(semanas) {
+    const fixo = imprimindo || matchMedia('(min-width: 1021px)').matches;
+    const m = imprimindo ? { num: 22, linha: 20, faixa: 14 } : { num: 30, linha: 26, faixa: 16 };
+    if (!fixo) return { ...m, altura: null, linhas: 3 };
+    const util = imprimindo ? 620 : folha().clientHeight - 18 - 70 - 28 - corrMes; // folha − margens − cabeçalho − dias da semana
+    const altura = Math.max(imprimindo ? 70 : 72, Math.floor(util / semanas));
+    return { ...m, altura, linhas: 0 };
+  }
   function telaMes() {
-    const p = periodo(), MAX = 3;
+    const p = periodo(), sems = [];
+    for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
+    const md = medidasMes(sems.length), lista = visiveis();
+    const longos = lista.filter(e => dif(e.ini, e.fim) + 1 >= LONGO), curtos = lista.filter(e => dif(e.ini, e.fim) + 1 < LONGO);
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
-    for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) {
-      const lanes = faixas(ws, visiveis());
-      html += `<div class="semana" data-ws="${ws}">`;
+    sems.forEach(ws => {
+      const fl = faixas(ws, longos), fc = faixas(ws, curtos);
+      const nFl = Math.min(fl.length, 3);
+      let nFc = md.linhas;
+      if (md.altura) nFc = Math.max(1, Math.floor((md.altura - md.num - 4 - nFl * md.faixa) / md.linha));
+      const escondidos = k => fl.slice(nFl).filter(ln => ln.some(x => x.c0 <= k && x.c1 >= k)).length + fc.slice(nFc).filter(ln => ln.some(x => x.c0 <= k && x.c1 >= k)).length;
+      const linhas = `${md.num}px${nFl ? ` repeat(${nFl}, ${md.faixa}px)` : ''} repeat(${nFc}, ${md.linha}px) minmax(4px, 1fr)`;
+      html += `<div class="semana" data-ws="${ws}" style="grid-template-rows:${linhas}${md.altura ? `;height:${md.altura}px` : ''}">`;
       for (let k = 0; k < 7; k++) {
-        const d = soma(ws, k), pz = prazosDe(d, d), extra = lanes.slice(MAX).filter(ln => ln.some(s => s.c0 <= k && s.c1 >= k)).length;
+        const d = soma(ws, k), pz = prazosDe(d, d), extra = escondidos(k);
         html += `<div class="cel${d.slice(0, 7) !== p.a.slice(0, 7) ? ' fora' : ''}${k > 4 ? ' fds' : ''}${d === HOJE ? ' hoje' : ''}" style="grid-column:${k + 1}">
           <span class="num"${d === HOJE ? ' aria-label="hoje"' : ''}>${dt(d).getDate()}</span>
-          ${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
+          <span class="cel-extra">${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
             ${popDia === d ? `<div class="prazo-pop">${pz.map(({ e, i }) => `<button type="button" data-abrir="${e.id}"><b>${esc(i.txt)}</b><small>${sig(e)} · ${esc(e.titulo)}</small></button>`).join('')}</div>` : ''}</span>` : ''}
-          ${extra ? `<button type="button" class="mais" data-semana="${ws}" style="position:absolute;bottom:4px;right:4px">+${extra} mais</button>` : ''}
+          ${extra ? `<button type="button" class="mais" data-semana="${ws}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''}: ver a semana">+${extra}</button>` : ''}</span>
         </div>`;
       }
-      lanes.slice(0, MAX).forEach((ln, li) => ln.forEach(({ e, c0, c1 }) => {
-        html += `<button type="button" class="barra${e.ini < soma(ws, c0) ? ' continua-esq' : ''}${e.fim > soma(ws, c1) ? ' continua-dir' : ''}${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`;
+      fl.slice(0, nFl).forEach((ln, li) => ln.forEach(({ e, c0, c1 }) => {
+        html += `<button type="button" class="faixa-longa${e.ini < soma(ws, c0) ? ' continua-esq' : ''}${e.fim > soma(ws, c1) ? ' continua-dir' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span><span class="ate">${e.fim > soma(ws, c1) ? 'até ' + curto(e.fim) : ''}</span></button>`;
+      }));
+      fc.slice(0, nFc).forEach((ln, li) => ln.forEach(({ e, c0, c1 }) => {
+        html += `<button type="button" class="barra${e.ini < soma(ws, c0) ? ' continua-esq' : ''}${e.fim > soma(ws, c1) ? ' continua-dir' : ''}${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${nFl + li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`;
       }));
       html += `</div>`;
-    }
+    });
     folha().innerHTML = html + rodape();
+    // mede o que sobrou (ou faltou) e acerta a altura das semanas numa segunda passada
+    if (md.altura && !imprimindo && !telaMes.ajustando) {
+      const f = folha(), sobra = f.scrollHeight - f.clientHeight;
+      if (sobra > 0 || sobra < -8) { corrMes = Math.max(-200, corrMes + sobra + 2); telaMes.ajustando = true; telaMes(); telaMes.ajustando = false; }
+    }
   }
 
   /* ---------- semana ---------- */
@@ -436,10 +465,11 @@
   function imprimir() {
     const st = document.createElement('style');
     st.textContent = `@page { size: A4 ${vista === 'lista' ? 'portrait' : 'landscape'}; margin: 12mm; }`;
-    document.head.appendChild(st); popDia = null; desenhar();
-    window.print(); setTimeout(() => st.remove(), 500);
+    document.head.appendChild(st); popDia = null; imprimindo = true; desenhar();
+    window.print(); imprimindo = false; desenhar(); setTimeout(() => st.remove(), 500);
   }
   window.addEventListener('beforeunload', () => A.salvarJa && A.salvarJa());
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (A.estado && vista === 'mes') desenhar(); }, 150); });
 
   /* ---------- entrada: mesmas contas do sistema ---------- */
   function mostrarCabeca() {

@@ -88,9 +88,10 @@ svg.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-wid
 .barra .sig { flex: none; padding: 0 4px; margin-left: -2px; font-weight: 800; font-stretch: 85%;
   background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 22%, #fff), color-mix(in srgb, var(--pc) 30%, #fff) 10%, color-mix(in srgb, var(--pc) 30%, #fff) 90%, color-mix(in srgb, var(--pc) 18%, #fff)); border-radius: 1px 6px 2px 5px / 5px 2px 6px 1px; }
 .barra .t { overflow: hidden; text-overflow: ellipsis; }
-.barra.continua-esq { border-left-style: dashed; }
-.barra.continua-dir { border-right-style: dashed; }
+.barra.continua-esq { border-left-color: transparent; margin-left: 0; }
+.barra.continua-dir { border-right-color: transparent; margin-right: 0; }
 .barra.feito .t { text-decoration: line-through; color: var(--tinta-2); }
+.semana .mais { position: absolute; right: 4px; bottom: 3px; z-index: 3; }
 .mais { margin: 2px 6px; font-size: 12px; font-weight: 700; color: var(--tinta-2); background: none; border: 0; cursor: pointer; padding: 2px 0; text-decoration: underline; }
 
 /* ---------- semana ---------- */
@@ -308,3 +309,56 @@ html[data-vt=suave]::view-transition-old(*), html[data-vt=suave]::view-transitio
 /* filtro Todos · Internos · Externos */
 .filtro-tipo button { font-size: 12.5px; padding: 7px 11px; }
 @media (max-width: 640px) { .filtro-tipo { width: 100%; } .filtro-tipo button { flex: 1; } }
+
+/* eventos longos (7 dias ou mais): faixa fina no alto da semana */
+.faixa-longa { position: relative; z-index: 1; margin: 1px 0; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 6px; border: 0; cursor: pointer; text-align: left; overflow: hidden; white-space: nowrap;
+  background: color-mix(in srgb, var(--pc) 24%, #fff); border-top: 1px solid color-mix(in srgb, var(--pc) 60%, #fff); border-bottom: 1px solid color-mix(in srgb, var(--pc) 60%, #fff); font-size: 11.5px; line-height: 1; }
+.faixa-longa:hover { background: color-mix(in srgb, var(--pc) 34%, #fff); }
+.faixa-longa:not(.continua-esq) { border-left: 3px solid var(--pc); margin-left: 4px; }
+.faixa-longa:not(.continua-dir) { margin-right: 4px; }
+.faixa-longa .sig { font-weight: 800; font-stretch: 85%; flex: none; }
+.faixa-longa .t { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
+.faixa-longa .ate { margin-left: auto; flex: none; font-weight: 700; color: var(--tinta-2); font-size: 10.5px; }
+
+/* ===== tela cheia no computador: a página não rola; só a coluna de eventos ===== */
+@media (min-width: 1021px) {
+  html, body { height: 100%; overflow: hidden; }
+  .moldura { height: 100vh; height: 100dvh; min-height: 0; }
+  .cortica { flex: 1; min-height: 0; padding: 16px 24px; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .folha { min-height: 0; height: 100%; overflow: auto; padding: 18px 22px 0; }
+  .folha-cab { min-height: 74px; }
+  .mural-lado { min-height: 0; height: 100%; overflow-y: auto; align-content: start; padding: 0 8px 16px 2px; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: var(--fio) transparent; }
+  .mural-lado::-webkit-scrollbar { width: 8px; }
+  .mural-lado::-webkit-scrollbar-thumb { background: var(--fio); }
+  .lado-t { position: sticky; top: 0; z-index: 2; background: var(--mesa); padding-top: 2px; }
+  .sem-grade { min-height: 100%; }
+}
+
+/* ===== impressão do mês: uma folha A4 deitada ===== */
+@media print {
+  html, body { height: auto !important; overflow: visible !important; }
+  .moldura { height: auto !important; }
+  .folha { height: auto !important; overflow: visible !important; padding: 0 !important; }
+  .folha-cab { min-height: 0; padding-bottom: 5px; }
+  .folha-cab h1 { font-size: 26px; }
+  .dias-sem span { padding: 4px 6px 3px; font-size: 11px; }
+  .semana .cel { padding: 3px 5px 0; background: none !important; }
+  .semana .cel.fds { background: var(--fds) !important; }
+  .num { font-size: 13px; padding: 1px 3px; }
+  .barra { min-height: 18px; font-size: 11px; padding: 0 5px; }
+  .faixa-longa { font-size: 10px; }
+  .mais { font-size: 10px; text-decoration: none; }
+  .prazo-tag { font-size: 9.5px; min-height: 15px; }
+  .rodape-imp { margin-top: 4px; }
+}
+
+/* número do dia, prazos e +N na mesma linha (o mês cabe na tela) */
+.cel-extra { position: absolute; top: 5px; right: 4px; z-index: 3; display: flex; gap: 4px; align-items: center; }
+.cel-extra .prazos-dia { position: relative; bottom: auto; left: auto; }
+.cel-extra .prazo-pop { top: 26px; bottom: auto; left: auto; right: 0; }
+.semana .mais { position: static; margin: 0; min-height: 22px; padding: 0 6px; border: 1px solid var(--fio); background: #fff; color: var(--tinta); text-decoration: none; font-size: 11.5px; font-weight: 800; }
+.semana .mais:hover { border-color: var(--tinta); }
+@media (min-width: 1021px) { .folha-cab { min-height: 0; padding-bottom: 6px; } .folha-cab h1 { font-size: 30px; } .dias-sem span { padding: 6px 6px 4px; } }
+@media (max-width: 640px) { .cel-extra { top: 2px; right: 1px; gap: 2px; } .semana .mais { min-height: 18px; font-size: 10px; padding: 0 3px; } }
+@media print { .semana .mais { border: 0; padding: 0; } }
