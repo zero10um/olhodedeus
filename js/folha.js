@@ -179,9 +179,10 @@
     return l;
   }
   const nev = e => NUMS.has(e.id) ? `<span class="nev" aria-hidden="true">${NUMS.get(e.id)}</span>` : '';
-  const legendaEventos = l => l.length ? `<section class="legenda-ev" aria-label="Legenda dos eventos"><h2>Eventos do mês</h2><ol>${l.map(e => `<li><span class="nev">${NUMS.get(e.id)}</span><span class="sig grifo" style="--pc:${pc(e)}">${sig(e)}</span><span class="le-t"><b>${esc(e.titulo)}</b> · ${intervalo(e)}${[e.local, e.hora].filter(Boolean).map(x => ' · ' + esc(x)).join('')} · ${esc(pessoa(e.dono).ini)}</span></li>`).join('')}</ol></section>` : '';
+  const legendaEventos = l => l.length ? `<section class="legenda-ev" aria-label="Legenda dos eventos"><h2>Eventos do mês</h2><ol>${l.map(e => `<li><span class="nev">${NUMS.get(e.id)}</span><span class="sig grifo" style="--pc:${pc(e)}">${sig(e)}</span><span class="le-t"><b>${esc(e.titulo)}</b> · ${intervalo(e)}${[e.local, e.hora].filter(Boolean).map(x => ' · ' + esc(x)).join('')} · ${esc(pessoa(e.dono).ini)}${soMeus && e.proc.sei ? ` · <b class="le-sei">SEI ${esc(A.seiCurto(e.proc.sei))}</b>` : ''}</span></li>`).join('')}</ol></section>` : '';
+  // na folha de uma pessoa só ("Só os meus"), a legenda traz também o número do SEI de cada evento
   // altura que a legenda vai ocupar na folha impressa (duas colunas, uma linha e meia por evento em média)
-  const alturaLegenda = n => n ? 30 + Math.ceil(n / 2) * 19 : 0;
+  const alturaLegenda = n => n ? 30 + Math.ceil(n / 2) * (soMeus ? 24 : 19) : 0;
   let nLegenda = 0;
   function medidasMes(semanas) {
     const fixo = imprimindo || matchMedia('(min-width: 1021px)').matches;
