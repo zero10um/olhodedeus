@@ -19,6 +19,7 @@
   const ic = n => `<svg class="ic" aria-hidden="true"><use href="#i-${n}"/></svg>`;
   const ehData = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
   let HOJE = iso(new Date());
+  const fimDeSemana = d => { const k = dt(d).getDay(); return k === 0 || k === 6; };
 
   /* ---------- processos vistos como eventos ---------- */
   let PESSOAS = {}, eventos = [];
@@ -28,9 +29,17 @@
     const itens = (p.frentes || []).filter(f => !f.na).flatMap(f => f.itens.filter(i => !i.na).map(i => ({
       id: i.id, txt: i.nome, feito: i.estado === 'feita', prazo: A.prazo(p, i) || '', cal: !!i.noCal, acomp: i.quem === 'acompanha',
     })));
-    const dias = Array.isArray(p.dias) && p.dias.length ? p.dias.filter(ehData).slice().sort() : null;
-    return { id: p.id, proc: p, dias, dono: p.dono, titulo: p.titulo, amb: p.ambito === 'externo' || (!p.ambito && grupo === 'externo') ? 'E' : 'I',
-      pub: PUB[p.publico] || '', ini: p.inicio, fim: ehData(p.fim) && p.fim >= p.inicio ? p.fim : p.inicio, hora: p.horario || '', local: p.local || '', itens };
+    const sep = Array.isArray(p.dias) && p.dias.length ? p.dias.filter(ehData).slice().sort() : null;
+    const ini = p.inicio, fim = ehData(p.fim) && p.fim >= p.inicio ? p.fim : p.inicio;
+    // seguidos: sábado e domingo só entram se a pessoa marcou (ou, sem escolha gravada, se o evento começa ou termina no fim de semana)
+    const fds = typeof p.fimDeSemana === 'boolean' ? p.fimDeSemana : fimDeSemana(ini) || fimDeSemana(fim);
+    let dias = sep, util = false;
+    if (!sep && !fds && fim > ini) {
+      const l = []; for (let d = ini; d <= fim; d = soma(d, 1)) if (!fimDeSemana(d)) l.push(d);
+      if (l.length && l.length < dif(ini, fim) + 1) { dias = l; util = true; } // só muda algo se havia sábado ou domingo no meio
+    }
+    return { id: p.id, proc: p, dias, sep, fds, util, dono: p.dono, titulo: p.titulo, amb: p.ambito === 'externo' || (!p.ambito && grupo === 'externo') ? 'E' : 'I',
+      pub: PUB[p.publico] || '', ini, fim, hora: p.horario || '', local: p.local || '', itens };
   }
   function carregar() {
     HOJE = iso(new Date());
@@ -52,7 +61,7 @@
     return out;
   }
   const faixaTxt = ([a, b]) => a === b ? curto(a) : a.slice(0, 7) === b.slice(0, 7) ? `${dt(a).getDate()}–${curto(b)}` : `${curto(a)} – ${curto(b)}`;
-  const intervalo = e => e.dias ? trechosDe(e.dias).map(faixaTxt).join(' · ') : e.ini === e.fim ? curto(e.ini) : `${curto(e.ini)} – ${curto(e.fim)}`;
+  const intervalo = e => e.util ? `${faixaTxt([e.ini, e.fim])} · seg. a sex.` : e.dias ? trechosDe(e.dias).map(faixaTxt).join(' · ') : e.ini === e.fim ? curto(e.ini) : `${curto(e.ini)} – ${curto(e.fim)}`;
   const ocorre = (e, d) => e.dias ? e.dias.includes(d) : e.ini <= d && d <= e.fim;
   const duracao = e => e.dias ? e.dias.length : dif(e.ini, e.fim) + 1;
 
@@ -86,7 +95,7 @@
     toque(e.proc);
   }
   function salvarEvento(d, existente) {
-    const campos = { titulo: d.titulo, inicio: d.ini, fim: d.fim, horario: d.hora, local: d.local, ambito: d.amb === 'E' ? 'externo' : 'interno', publico: PUB_INV[d.pub] };
+    const campos = { titulo: d.titulo, inicio: d.ini, fim: d.fim, fimDeSemana: d.fds, horario: d.hora, local: d.local, ambito: d.amb === 'E' ? 'externo' : 'interno', publico: PUB_INV[d.pub] };
     if (!existente) {
       const p = A.novoProcesso({ tipoId: d.amb === 'E' ? 'externo' : 'interno', ...campos }, eu());
       p.frentes = []; frenteLivre(p); // o checklist começa vazio
@@ -151,7 +160,7 @@
     if (!e.dias) return noPeriodo(e, ws, we) ? [{ c0: Math.max(0, dif(ws, e.ini)), c1: Math.min(6, dif(ws, e.fim)), esq: e.ini < ws, dir: e.fim > we }] : [];
     const out = [];
     e.dias.filter(d => d >= ws && d <= we).map(d => dif(ws, d)).forEach(c => { const u = out[out.length - 1]; if (u && c === u.c1 + 1) u.c1 = c; else out.push({ c0: c, c1: c }); });
-    out.forEach(x => { x.esq = x.c0 === 0 && e.dias.includes(soma(ws, -1)); x.dir = x.c1 === 6 && e.dias.includes(soma(ws, 7)); });
+    out.forEach(x => { x.esq = e.util ? x.c0 === 0 && e.ini < ws : x.c0 === 0 && e.dias.includes(soma(ws, -1)); x.dir = e.util ? x.c1 === 4 && e.fim > soma(ws, 4) : x.c1 === 6 && e.dias.includes(soma(ws, 7)); });
     return out;
   }
   function faixas(ws, lista) {
@@ -421,9 +430,10 @@
         <div><span class="r rot" id="rPub" style="display:block;margin-bottom:5px">Para quem</span>
           <div class="escolha" role="radiogroup" aria-labelledby="rPub" style="--n:3">${[['M', 'Membros'], ['S', 'Servidores'], ['MS', 'Os dois']].map(([v, n]) => `<label><input type="radio" name="pub" value="${v}" ${pub === v ? 'checked' : ''}><span><b>${v}</b><small>${n}</small></span></label>`).join('')}</div></div>
         <div><span class="r rot" id="rDatas" style="display:block;margin-bottom:5px">Datas</span>
-          <div class="escolha" role="radiogroup" aria-labelledby="rDatas"><label><input type="radio" name="modoDatas" value="seguidos" ${e.dias ? '' : 'checked'}><span><b>Seguidos</b><small>Do início ao fim</small></span></label><label><input type="radio" name="modoDatas" value="separados" ${e.dias ? 'checked' : ''}><span><b>Separados</b><small>Escolher dia por dia</small></span></label></div></div>
-        <div class="duas" id="dSeguidos" ${e.dias ? 'hidden' : ''}><div><label class="r" for="fIni">Início</label><input type="date" class="campo" id="fIni" value="${e.ini}"></div><div><label class="r" for="fFim">Fim</label><input type="date" class="campo" id="fFim" value="${e.fim || e.ini}"></div></div>
-        <div id="dSeparados" ${e.dias ? '' : 'hidden'}><div class="seletor-dias" id="selDias" role="group" aria-label="Dias em que o evento acontece"></div><p class="dias-escolhidos" id="diasEsc" aria-live="polite"></p></div>
+          <div class="escolha" role="radiogroup" aria-labelledby="rDatas"><label><input type="radio" name="modoDatas" value="seguidos" ${e.sep ? '' : 'checked'}><span><b>Seguidos</b><small>Do início ao fim</small></span></label><label><input type="radio" name="modoDatas" value="separados" ${e.sep ? 'checked' : ''}><span><b>Separados</b><small>Escolher dia por dia</small></span></label></div></div>
+        <div id="dSeguidos" ${e.sep ? 'hidden' : ''}><div class="duas"><div><label class="r" for="fIni">Início</label><input type="date" class="campo" id="fIni" value="${e.ini}"></div><div><label class="r" for="fFim">Fim</label><input type="date" class="campo" id="fFim" value="${e.fim || e.ini}"></div></div>
+          <label class="caixa fds"><input type="checkbox" id="fFds" ${e.fds ? 'checked' : ''}><span>Acontece também no sábado e no domingo<small>Desmarcado, o evento aparece só de segunda a sexta.</small></span></label></div>
+        <div id="dSeparados" ${e.sep ? '' : 'hidden'}><div class="seletor-dias" id="selDias" role="group" aria-label="Dias em que o evento acontece"></div><p class="dias-escolhidos" id="diasEsc" aria-live="polite"></p></div>
         <div class="duas"><div><label class="r" for="fHora">Horário <small style="text-transform:none;letter-spacing:0">(opcional)</small></label><input class="campo" id="fHora" value="${esc(e.hora)}" placeholder="Ex.: 08h às 12h" maxlength="60"></div>
           <div><label class="r" for="fLocal">Local ou sala</label><input class="campo" id="fLocal" list="salas" value="${esc(e.local)}" placeholder="Escolha ou escreva" maxlength="120"></div></div>
         <datalist id="salas">${(A.salas ? A.salas() : []).map(s => `<option value="${esc(s)}">`).join('')}</datalist>
@@ -432,11 +442,17 @@
       </div></form>`;
     const f = lado().querySelector('#fEv'), sg = () => { f.querySelector('#feSig').textContent = `${f.amb.value} ${f.pub.value}`; };
     f.querySelectorAll('[name=amb],[name=pub]').forEach(r => r.onchange = sg);
-    f.querySelector('#fIni').onchange = ev => { const fim = f.querySelector('#fFim'); if (!fim.value || fim.value < ev.target.value) fim.value = ev.target.value; };
+    // quem ainda não mexeu na caixa: começar ou terminar no sábado/domingo já a marca
+    let fdsTocado = !!ed && typeof ed.proc.fimDeSemana === 'boolean';
+    const fdsAuto = () => { if (fdsTocado) return; const a = f.querySelector('#fIni').value, b = f.querySelector('#fFim').value || a; f.querySelector('#fFds').checked = !!a && (fimDeSemana(a) || fimDeSemana(b)); };
+    f.querySelector('#fFds').onchange = () => { fdsTocado = true; };
+    f.querySelector('#fIni').onchange = ev => { const fim = f.querySelector('#fFim'); if (!fim.value || fim.value < ev.target.value) fim.value = ev.target.value; fdsAuto(); };
+    f.querySelector('#fFim').onchange = fdsAuto;
+    if (!ed) fdsAuto();
     f.querySelector('#cancelar').onclick = () => { formando = null; desenhar(); };
     // seletor de dias separados: clicar nos dias do mês
-    const sel = new Set(e.dias || []);
-    let mesSel = ((e.dias && e.dias[0]) || e.ini || HOJE).slice(0, 7) + '-01';
+    const sel = new Set(e.sep || []);
+    let mesSel = ((e.sep && e.sep[0]) || e.ini || HOJE).slice(0, 7) + '-01';
     function pintarDias() {
       const d0 = dt(mesSel), a = d0.getFullYear(), m = d0.getMonth(), ult = iso(new Date(a, m + 1, 0));
       let h = `<div class="sd-topo"><button type="button" class="sd-nav" data-sdmes="-1" aria-label="Mês anterior">${ic('esq')}</button><b>${MESES[m]} ${a}</b><button type="button" class="sd-nav" data-sdmes="1" aria-label="Próximo mês">${ic('dir')}</button></div><div class="sd-grade">${SEM.map(x => `<span class="sd-cab" aria-hidden="true">${x[0].toUpperCase()}</span>`).join('')}`;
@@ -458,12 +474,12 @@
     });
     f.querySelectorAll('[name=modoDatas]').forEach(r => r.onchange = () => {
       const sep = f.modoDatas.value === 'separados', ini = f.querySelector('#fIni'), fim = f.querySelector('#fFim');
-      if (sep && !sel.size && ini.value) { for (let d = ini.value; d <= (fim.value || ini.value) && sel.size < 62; d = soma(d, 1)) sel.add(d); mesSel = ini.value.slice(0, 7) + '-01'; }
+      if (sep && !sel.size && ini.value) { for (let d = ini.value; d <= (fim.value || ini.value) && sel.size < 62; d = soma(d, 1)) if (f.querySelector('#fFds').checked || !fimDeSemana(d) || ini.value === (fim.value || ini.value)) sel.add(d); mesSel = ini.value.slice(0, 7) + '-01'; }
       if (!sep && sel.size) { const l = [...sel].sort(); ini.value = l[0]; fim.value = l[l.length - 1]; }
       f.querySelector('#dSeguidos').hidden = sep; f.querySelector('#dSeparados').hidden = !sep;
       if (sep) pintarDias();
     });
-    if (e.dias) pintarDias();
+    if (e.sep) pintarDias();
     f.onsubmit = ev => {
       ev.preventDefault();
       const er = f.querySelector('#feErro'), t = f.querySelector('#fTit').value.trim(), sep = f.modoDatas.value === 'separados', l = [...sel].sort();
@@ -474,7 +490,7 @@
       if (sep && !l.length) return falha('Escolha pelo menos um dia no calendário.', f.querySelector('.sd-dia'));
       if (!ini) return falha('Escolha a data de início.', f.querySelector('#fIni'));
       if (fim < ini) return falha('O fim não pode ser antes do início.', f.querySelector('#fFim'));
-      aberto = salvarEvento({ titulo: t, amb: f.amb.value, pub: f.pub.value, ini, fim, dias, hora: f.querySelector('#fHora').value.trim(), local: f.querySelector('#fLocal').value.trim() }, ed);
+      aberto = salvarEvento({ titulo: t, amb: f.amb.value, pub: f.pub.value, ini, fim, dias, fds: f.querySelector('#fFds').checked, hora: f.querySelector('#fHora').value.trim(), local: f.querySelector('#fLocal').value.trim() }, ed);
       ref = ini; formando = null; desenhar(); focar('#ab-t');
       A.avisar(ed ? 'Evento salvo.' : 'Evento criado.');
     };
