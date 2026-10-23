@@ -193,29 +193,20 @@
     const altura = Math.max(imprimindo ? 58 : 72, Math.floor(util / semanas));
     return { ...m, altura, linhas: 0 };
   }
-  /* Impressão: nenhum evento fica escondido. Cada semana recebe a altura de que precisa; se não couber,
-     tudo encolhe um pouco (até 75%); se ainda assim não couber, o mês continua numa segunda folha. */
-  const PAGINA = 570, PAGINA_SEGUINTE = 640;
+  /* Impressão: nenhum evento fica escondido e o mês cabe sempre numa folha só. Cada semana recebe a
+     altura de que precisa; se não couber, linhas e letras encolhem um pouco (até 80%); se ainda assim
+     não couber, a folha inteira é reduzida na proporção certa, como o "ajustar à página" da impressora. */
+  const PAGINA = 590;
   function planoImpressao(alturaDe, n) {
     const util = PAGINA - alturaLegenda(nLegenda);
     let esc = 1, tot = 0;
     for (let i = 0; i < n; i++) tot += alturaDe(i, 1);
-    if (tot > util) { esc = Math.max(0.75, util / tot); tot = 0; for (let i = 0; i < n; i++) tot += alturaDe(i, esc); }
-    const alturas = [], quebras = new Set();
-    if (tot <= util) {
-      const folga = (util - tot) / n;
-      for (let i = 0; i < n; i++) alturas.push(Math.floor(alturaDe(i, esc) + folga));
-    } else {
-      let cap = PAGINA, usado = 0;
-      for (let i = 0; i < n; i++) {
-        const h = Math.ceil(alturaDe(i, esc));
-        if (usado + h > cap && usado > 0) { quebras.add(i); cap = PAGINA_SEGUINTE; usado = 0; }
-        usado += h; alturas.push(h);
-      }
-    }
-    return { esc, alturas, quebras };
+    if (tot > util) { esc = Math.max(0.8, util / tot); tot = 0; for (let i = 0; i < n; i++) tot += alturaDe(i, esc); }
+    const zoom = tot > util ? Math.max(0.35, (util / tot) * 0.98) : 1;
+    const folga = tot < util ? (util - tot) / n : 0, alturas = [];
+    for (let i = 0; i < n; i++) alturas.push(Math.floor(alturaDe(i, esc) + folga));
+    return { esc, zoom, alturas };
   }
-  const quebraPagina = () => `<div class="quebra-pag" aria-hidden="true"><span>${MESES[dt(ref).getMonth()]} ${dt(ref).getFullYear()} (continuação)</span></div><div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
   // "+N": lista de todos os eventos daquele dia, sem sair do mês
   function maisHTML(d, ws, extra) {
     if (!extra) return '';
@@ -231,11 +222,10 @@
     // na impressão: quantos eventos tem o dia mais cheio de cada semana
     const maxDia = sems.map(ws => Math.max(0, ...Array.from({ length: 7 }, (_, k) => lista.filter(e => ocorre(e, soma(ws, k))).length)));
     const plano = imprimindo ? planoImpressao((i, esc) => md.num + 6 + Math.max(1, maxDia[i]) * chip * esc, sems.length) : null;
-    if (plano) folha().style.setProperty('--esc', plano.esc);
+    if (plano) { folha().style.setProperty('--esc', plano.esc); folha().style.setProperty('--zoom', plano.zoom); }
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
     sems.forEach((ws, si) => {
-      if (plano && plano.quebras.has(si)) html += quebraPagina();
       const alt = plano ? plano.alturas[si] : md.altura;
       const cabe = plano ? 999 : md.altura ? Math.max(1, Math.floor((md.altura - md.num - 4) / chip)) : 4;
       html += `<div class="semana semana-dia${popMais && popMais >= ws && popMais <= soma(ws, 6) ? ' com-pop' : ''}" data-ws="${ws}" style="${alt ? `height:${alt}px` : ''}">`;
@@ -269,9 +259,8 @@
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
     const porSemana = sems.map(ws => ({ fl: faixas(ws, longos), fc: faixas(ws, curtos) }));
     const plano = imprimindo ? planoImpressao((i, esc) => md.num + 6 + porSemana[i].fl.length * md.faixa * esc + Math.max(1, porSemana[i].fc.length) * md.linha * esc, sems.length) : null;
-    if (plano) folha().style.setProperty('--esc', plano.esc);
+    if (plano) { folha().style.setProperty('--esc', plano.esc); folha().style.setProperty('--zoom', plano.zoom); }
     sems.forEach((ws, si) => {
-      if (plano && plano.quebras.has(si)) html += quebraPagina();
       const { fl, fc } = porSemana[si];
       const nFl = plano ? fl.length : Math.min(fl.length, 3);
       let nFc = md.linhas;
@@ -736,7 +725,7 @@
     const st = document.createElement('style');
     st.textContent = `@page { size: A4 ${vista === 'lista' ? 'portrait' : 'landscape'}; margin: 9mm 10mm; }`;
     document.head.appendChild(st); popDia = null; imprimindo = true; desenhar();
-    window.print(); imprimindo = false; folha().style.removeProperty('--esc'); desenhar(); setTimeout(() => st.remove(), 500);
+    window.print(); imprimindo = false; folha().style.removeProperty('--esc'); folha().style.removeProperty('--zoom'); desenhar(); setTimeout(() => st.remove(), 500);
   }
   window.addEventListener('beforeunload', () => A.salvarJa && A.salvarJa());
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (A.estado && vista === 'mes') desenhar(); }, 150); });

@@ -455,10 +455,7 @@ textarea.campo { font: inherit; font-size: 13.5px; line-height: 1.45; resize: ve
 .mais-pop .mp-semana { margin-top: 4px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 /* impressão com tudo visível: a escala encolhe letras e linhas quando o mês está cheio */
-.quebra-pag { display: none; }
 @media print {
-  .quebra-pag { display: block; break-before: page; padding: 0 0 4px; border-bottom: 2.5px solid var(--tinta); margin-bottom: 0; }
-  .quebra-pag span { font-size: 16px; font-weight: 800; font-stretch: 85%; text-transform: capitalize; }
   .barra { min-height: 0; font-size: calc(11px * var(--esc, 1)); }
   .faixa-longa { font-size: calc(10px * var(--esc, 1)); }
   .barra-dia { min-height: calc(16px * var(--esc, 1)); font-size: calc(9.5px * var(--esc, 1)); }
@@ -466,3 +463,6 @@ textarea.campo { font: inherit; font-size: 13.5px; line-height: 1.45; resize: ve
   .nev { min-width: calc(15px * var(--esc, 1)); height: calc(14px * var(--esc, 1)); font-size: calc(9px * var(--esc, 1)); }
   .mais-w, .mais { display: none !important; }
 }
+
+/* mês lotado: a folha inteira é reduzida para caber numa página (a largura compensa a redução) */
+@media print { .folha { zoom: var(--zoom, 1); width: calc(100% / var(--zoom, 1)); } }
