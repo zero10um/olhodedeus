@@ -104,7 +104,7 @@
   }
 
   /* ---------- estado da tela ---------- */
-  let vista = 'mes', ref = HOJE, aberto = null, formando = null, soMeus = false, popDia = null;
+  let vista = 'mes', ref = HOJE, aberto = null, formando = null, colando = null, soMeus = false, popDia = null;
   let tipoFiltro = 'todos';
   try { const v = sessionStorage.getItem('folha-vista'); if (['ano', 'mes', 'semana', 'lista'].includes(v)) vista = v; const f = sessionStorage.getItem('folha-tipo'); if (['todos', 'I', 'E'].includes(f)) tipoFiltro = f; } catch (e) {}
   // o que cada pessoa esconde do calendário e o jeito de ver o mês ficam nas preferências dela (os colegas não são afetados)
@@ -323,6 +323,7 @@
     </button>${oc ? '<span class="oculto-tag">fora do calendário</span>' : ''}<button type="button" class="ocultar" data-ocultar="${e.id}" aria-pressed="${oc}" aria-label="${oc ? 'Mostrar' : 'Ocultar'} ${esc(e.titulo)} ${oc ? 'no' : 'do'} calendário" title="${oc ? 'Mostrar no calendário' : 'Ocultar do calendário'}">${ic(oc ? 'mais' : 'menos')}</button></div>`;
   }
   function telaLado() {
+    if (colando) return telaColar();
     if (formando) return formulario();
     if (aberto) { const e = eventos.find(x => x.id === aberto); if (e) return eventoAberto(e); aberto = null; }
     const p = periodo();
@@ -488,7 +489,8 @@
       }
     });
     zoomAlvo = null;
-    emCurso.finished.finally(() => {
+    emCurso.ready.catch(() => {}); emCurso.updateCallbackDone.catch(() => {});
+    emCurso.finished.catch(() => {}).finally(() => {
       delete html.dataset.vt; emCurso = null;
       folha().style.viewTransitionName = '';
       folha().querySelectorAll('.mini, .semana').forEach(el => { el.style.viewTransitionName = ''; });
@@ -513,6 +515,110 @@
       else { d.setDate(1); d.setMonth(d.getMonth() + n); }
       ref = iso(d); popDia = null;
     });
+  }
+
+  /* ---------- colar uma lista de eventos ----------
+     Formato (um evento por bloco, blocos separados por linha em branco):
+       Nome: ...   In/Ex: In | Ex   Quem?: M | S | MS   Data: 05 de novembro | 16 a 19 de novembro de 2026 |
+       10, 11 e 12 de novembro | 30 de novembro a 4 de dezembro   SEI: 15411/2026-74   (Local e Horário são opcionais)
+     O sistema mostra o que entendeu antes de cadastrar. */
+  const NUM_MES = { janeiro: 1, fevereiro: 2, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12 };
+  function lerData(txt, anoPadrao) {
+    let x = A.semAcento(txt).replace(/[º°ª]/g, '').replace(/\s+/g, ' ');
+    const ano = +((x.match(/\b(20\d\d)\b/) || [])[1] || anoPadrao);
+    x = x.replace(/\s*de\s+20\d\d\b/g, '').replace(/\b20\d\d\b/g, '').trim();
+    const diaMes = (p, mesPadrao) => { const m = p.match(/(\d{1,2})(?:\s+de\s+([a-z]+))?/); if (!m) return null; const mes = m[2] ? NUM_MES[m[2]] : mesPadrao; return mes ? { dia: +m[1], mes } : null; };
+    const fmt = (dia, mes, a) => `${a}-${pad(mes)}-${pad(dia)}`;
+    const faixa = x.split(/\s+(?:a|ate)\s+(?=\d)/);
+    if (faixa.length === 2) {
+      const f = diaMes(faixa[1]); if (!f) return null;
+      const i = diaMes(faixa[0], f.mes); if (!i) return null;
+      const anoI = i.mes > f.mes ? ano - 1 : ano;
+      return { ini: fmt(i.dia, i.mes, anoI), fim: fmt(f.dia, f.mes, ano), dias: null };
+    }
+    const m = x.match(/((?:\d{1,2}\s*(?:,|\be\b)\s*)*\d{1,2})\s+de\s+([a-z]+)/);
+    if (!m || !NUM_MES[m[2]]) return null;
+    const lista = [...new Set(m[1].split(/\s*(?:,|\be\b)\s*/).filter(Boolean).map(Number))].sort((a, b) => a - b).map(d => fmt(d, NUM_MES[m[2]], ano));
+    const seguidos = lista.every((d, k) => k === 0 || dif(lista[k - 1], d) === 1);
+    return { ini: lista[0], fim: lista[lista.length - 1], dias: seguidos ? null : lista };
+  }
+  const seiCurtoLista = v => { const m = String(v || '').match(/(\d{1,7})\s*\/\s*(\d{4})\s*-\s*(\d{2})/); return m ? `${m[1].slice(-5).padStart(5, '0')}/${m[2]}-${m[3]}` : String(v || '').trim(); };
+  // cada bloco: linhas "Chave: valor" (aceita também "Quem? MS", sem dois-pontos)
+  function lerLista(texto) {
+    const anoPadrao = dt(HOJE).getFullYear();
+    return texto.replace(/\r/g, '').split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean).map(bloco => {
+      const c = {};
+      bloco.split('\n').forEach(l => { const m = l.match(/^\s*([^:?]{1,20})[:?]\s*(.*)$/); if (m) c[A.semAcento(m[1]).replace(/[^a-z/]/g, '')] = m[2].trim(); });
+      const nome0 = (c.nome || c.evento || c.titulo || '').trim(), nome = nome0.charAt(0).toUpperCase() + nome0.slice(1);
+      const ie = A.semAcento(c['in/ex'] || c.inex || c.tipo || '');
+      const amb = /^in$|interno/.test(ie) ? 'I' : /^ex$|externo/.test(ie) ? 'E' : '';
+      const q = A.semAcento(c.quem || c.publico || '').replace(/[^a-z]/g, '');
+      const pub = q === 'ms' || q === 'sm' || /ambos|membrosservidores/.test(q) ? 'MS' : q === 'm' || q === 'membros' ? 'M' : q === 's' || q === 'servidores' ? 'S' : '';
+      const datas = c.data || c.datas ? lerData(c.data || c.datas, anoPadrao) : null;
+      const avisos = [];
+      if (!nome) avisos.push('sem nome');
+      if (!amb) avisos.push(ie ? `"${c['in/ex'] || c.inex}": escolha interno ou externo` : 'falta In/Ex');
+      if (!pub) avisos.push('falta o público (M, S ou MS)');
+      if (!datas) avisos.push(c.data ? `não entendi a data "${c.data}"` : 'sem data');
+      const sei = seiCurtoLista(c.sei);
+      const repetido = eventos.some(e => e.titulo.trim().toLowerCase() === nome.toLowerCase() && (!sei || A.seiChave(e.proc.sei || '') === A.seiChave(sei)));
+      if (repetido) avisos.push('já existe um evento com esse nome');
+      return { nome, amb: amb || 'I', ambiguo: !amb, pub: pub || 'MS', datas, dataTxt: c.data || '', sei, local: c.local || '', hora: c.horario || c.hora || '',
+        avisos, marcado: !!(nome && datas && !repetido) };
+    });
+  }
+  function telaColar() {
+    const c = colando;
+    if (!c.itens) {
+      lado().innerHTML = `<form class="papel aberto" id="fColar" novalidate aria-labelledby="cl-t" style="--pc:${pessoa(eu()).cor}">
+        <div class="canhoto"><span class="sig grifo">lista</span><span class="quando">vários eventos</span></div>
+        <div class="aberto-corpo form-ev">
+          <h2 id="cl-t" style="margin:0">Colar lista de eventos</h2>
+          <p class="secundario" style="margin:0">Um evento por bloco, separados por uma linha em branco. Linhas: <b>Nome</b>, <b>In/Ex</b>, <b>Quem?</b>, <b>Data</b> e <b>SEI</b> (Local e Horário, se quiser).</p>
+          <label class="sr" for="clTxt">Lista de eventos</label>
+          <textarea class="campo" id="clTxt" rows="12" spellcheck="false" placeholder="Nome: Curso de Investigação Digital\nIn/Ex: In\nQuem? MS\nData: 05 de novembro\nSEI: 15411/2026-74">${esc(c.texto)}</textarea>
+          <div class="acoes-aberto"><button type="submit" class="btn primario">Ler a lista</button><button type="button" class="btn" id="clCancelar">Cancelar</button></div>
+        </div></form>`;
+      const f = lado().querySelector('#fColar');
+      f.querySelector('#clCancelar').onclick = () => { colando = null; desenhar(); };
+      f.onsubmit = ev => { ev.preventDefault(); c.texto = f.querySelector('#clTxt').value; c.itens = lerLista(c.texto); desenhar(); focar('#cl-t2'); };
+      return;
+    }
+    const n = c.itens.filter(i => i.marcado).length;
+    lado().innerHTML = `<form class="papel aberto" id="fColar2" novalidate aria-labelledby="cl-t2" style="--pc:${pessoa(eu()).cor}">
+      <div class="canhoto"><span class="sig grifo">lista</span><span class="quando">${c.itens.length} encontrados</span></div>
+      <div class="aberto-corpo">
+        <h2 id="cl-t2" tabindex="-1" style="margin:0 0 6px">Confira antes de cadastrar</h2>
+        <p class="secundario" style="margin:0 0 10px">Desmarque o que não quiser. O que precisa de atenção está grifado.</p>
+        <ul class="cl-lista">${c.itens.map((i, k) => `<li class="${i.avisos.length ? 'atencao' : ''}">
+          <label class="cl-marca"><input type="checkbox" data-clmarca="${k}" ${i.marcado ? 'checked' : ''} ${i.datas && i.nome ? '' : 'disabled'} aria-label="Cadastrar ${esc(i.nome || 'evento sem nome')}"></label>
+          <div class="cl-corpo">
+            <p class="cl-topo"><span class="sig grifo" style="--pc:${pessoa(eu()).cor}">${i.amb} ${i.pub}</span><span class="cl-datas">${i.datas ? intervalo({ ...i.datas, dias: i.datas.dias }) : '—'}</span>${i.sei ? `<span class="cl-sei">SEI ${esc(i.sei)}</span>` : ''}</p>
+            <b>${esc(i.nome || '(sem nome)')}</b>
+            ${i.ambiguo ? `<span class="cl-escolha">É <button type="button" class="btn-txt" data-clamb="${k}|I" aria-pressed="${i.amb === 'I'}">interno</button> ou <button type="button" class="btn-txt" data-clamb="${k}|E" aria-pressed="${i.amb === 'E'}">externo</button>?</span>` : ''}
+            ${i.avisos.length ? `<span class="cl-aviso">${i.avisos.map(esc).join(' · ')}</span>` : ''}
+          </div></li>`).join('')}</ul>
+        <div class="acoes-aberto"><button type="submit" class="btn primario" ${n ? '' : 'disabled'}>Cadastrar ${n} evento${n === 1 ? '' : 's'}</button><button type="button" class="btn" id="clVoltar">Voltar ao texto</button><button type="button" class="btn" id="clCancelar">Cancelar</button></div>
+      </div></form>`;
+    const f = lado().querySelector('#fColar2');
+    f.querySelectorAll('[data-clmarca]').forEach(cb => cb.onchange = () => { c.itens[+cb.dataset.clmarca].marcado = cb.checked; desenhar(); const x = lado().querySelector(`[data-clmarca="${cb.dataset.clmarca}"]`); if (x) x.focus(); });
+    f.querySelectorAll('[data-clamb]').forEach(b => b.onclick = () => { const [k, v] = b.dataset.clamb.split('|'); c.itens[+k].amb = v; desenhar(); });
+    f.querySelector('#clVoltar').onclick = () => { c.itens = null; desenhar(); focar('#clTxt'); };
+    f.querySelector('#clCancelar').onclick = () => { colando = null; desenhar(); };
+    f.onsubmit = ev => {
+      ev.preventDefault();
+      const criados = [];
+      c.itens.filter(i => i.marcado && i.datas && i.nome).forEach(i => {
+        const p = A.novoProcesso({ tipoId: i.amb === 'E' ? 'externo' : 'interno', titulo: i.nome, sei: i.sei, inicio: i.datas.ini, fim: i.datas.fim, horario: i.hora, local: i.local,
+          ambito: i.amb === 'E' ? 'externo' : 'interno', publico: PUB_INV[i.pub] }, eu());
+        p.frentes = []; frenteLivre(p);
+        if (i.datas.dias) p.dias = i.datas.dias;
+        A.estado.processos.push(p); criados.push(p);
+      });
+      A.salvar();
+      colando = null; ref = criados.length ? criados.map(p => p.inicio).sort()[0] : ref; desenhar();
+      A.avisar(`${criados.length} evento${criados.length === 1 ? '' : 's'} cadastrado${criados.length === 1 ? '' : 's'}.`, () => { criados.forEach(p => A.apagarProcesso(p)); desenhar(); });
+    };
   }
 
   /* ---------- desenho ---------- */
@@ -544,7 +650,7 @@
     if (t.dataset.modo) { if (t.dataset.modo !== modoMes()) transicao('suave', () => { prefs().agendaModoMes = t.dataset.modo; A.salvar(); }); return; }
     if (t.dataset.tipo) { if (t.dataset.tipo !== tipoFiltro) transicao('suave', () => { tipoFiltro = t.dataset.tipo; try { sessionStorage.setItem('folha-tipo', tipoFiltro); } catch (e) {} }); return; }
     if (t.dataset.abrir) {
-      popDia = null; formando = null; aberto = t.dataset.abrir;
+      popDia = null; formando = null; colando = null; aberto = t.dataset.abrir;
       const e = eventos.find(x => x.id === aberto); if (e && vista !== 'ano' && !noPeriodo(e, periodo().a, periodo().b)) ref = e.ini;
       desenhar(); focar('#ab-t'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
     }
@@ -562,7 +668,8 @@
       case 'ant': andarAnimado(-1); break;
       case 'prox': andarAnimado(1); break;
       case 'hoje': { const p0 = periodo(); if (HOJE >= p0.a && HOJE <= p0.b) break; transicao(HOJE > ref ? 'prox' : 'ant', () => { ref = HOJE; popDia = null; }); break; }
-      case 'novo': aberto = null; formando = 'novo'; desenhar(); focar('#fTit'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth' }); break;
+      case 'colar': aberto = null; formando = null; colando = { texto: '', itens: null }; desenhar(); focar('#clTxt'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth' }); break;
+      case 'novo': aberto = null; colando = null; formando = 'novo'; desenhar(); focar('#fTit'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth' }); break;
       case 'fechar': { const id = aberto; aberto = null; desenhar(); requestAnimationFrame(() => { const b = lado().querySelector(`[data-abrir="${id}"]`); if (b) b.focus(); }); break; }
       case 'editar': formando = aberto; desenhar(); focar('#fTit'); break;
       case 'apagar': {
