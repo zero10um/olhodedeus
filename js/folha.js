@@ -180,7 +180,8 @@
   }
   const nev = e => NUMS.has(e.id) ? `<span class="nev" aria-hidden="true">${NUMS.get(e.id)}</span>` : '';
   const legendaEventos = l => l.length ? `<section class="legenda-ev" aria-label="Legenda dos eventos"><h2>Eventos do mês</h2><ol>${l.map(e => `<li><span class="nev">${NUMS.get(e.id)}</span><span class="sig grifo" style="--pc:${pc(e)}">${sig(e)}</span><span class="le-t"><b>${esc(e.titulo)}</b> · ${intervalo(e)}${[e.local, e.hora].filter(Boolean).map(x => ' · ' + esc(x)).join('')} · ${esc(pessoa(e.dono).ini)}${soMeus && e.proc.sei ? ` · <b class="le-sei">SEI ${esc(A.seiCurto(e.proc.sei))}</b>` : ''}</span></li>`).join('')}</ol></section>` : '';
-  // na folha de uma pessoa só ("Só os meus"), a legenda traz também o número do SEI de cada evento
+  // dois tipos de impressão: a folha da equipe é só o calendário; a folha individual ("Só os meus")
+  // traz números e a legenda com nome inteiro, dias, local e SEI de cada evento
   // altura que a legenda vai ocupar na folha impressa (duas colunas, uma linha e meia por evento em média)
   const alturaLegenda = n => n ? 30 + Math.ceil(n / 2) * (soMeus ? 24 : 19) : 0;
   let nLegenda = 0;
@@ -195,7 +196,7 @@
   function telaMesDia() {
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
-    const doMes = numerar(p); nLegenda = doMes.length;
+    const doMes = soMeus ? numerar(p) : (NUMS = new Map(), []); nLegenda = doMes.length; // números e legenda só na folha individual
     const md = medidasMes(sems.length), lista = visiveis().slice().sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
     const chip = imprimindo ? 18 : 26;
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
@@ -226,7 +227,7 @@
     if (modoMes() === 'dia') return telaMesDia();
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
-    const doMes = numerar(p); nLegenda = doMes.length;
+    const doMes = soMeus ? numerar(p) : (NUMS = new Map(), []); nLegenda = doMes.length; // números e legenda só na folha individual
     const md = medidasMes(sems.length), lista = visiveis();
     const longos = lista.filter(e => duracao(e) >= LONGO), curtos = lista.filter(e => duracao(e) < LONGO);
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
