@@ -170,17 +170,31 @@
      para não roubar as linhas dos eventos curtos. */
   const LONGO = 7;
   let imprimindo = false, corrMes = 0;
+  /* Na impressão, cada evento do mês ganha um número; embaixo do calendário, a legenda traz o nome
+     inteiro, os dias, o local e o responsável. Assim o nome cortado no quadradinho não atrapalha. */
+  let NUMS = new Map();
+  function numerar(p) {
+    const l = visiveis().filter(e => noPeriodo(e, p.a, p.b)).sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
+    NUMS = new Map(l.map((e, k) => [e.id, k + 1]));
+    return l;
+  }
+  const nev = e => NUMS.has(e.id) ? `<span class="nev" aria-hidden="true">${NUMS.get(e.id)}</span>` : '';
+  const legendaEventos = l => l.length ? `<section class="legenda-ev" aria-label="Legenda dos eventos"><h2>Eventos do mês</h2><ol>${l.map(e => `<li><span class="nev">${NUMS.get(e.id)}</span><span class="sig grifo" style="--pc:${pc(e)}">${sig(e)}</span><span class="le-t"><b>${esc(e.titulo)}</b> · ${intervalo(e)}${[e.local, e.hora].filter(Boolean).map(x => ' · ' + esc(x)).join('')} · ${esc(pessoa(e.dono).ini)}</span></li>`).join('')}</ol></section>` : '';
+  // altura que a legenda vai ocupar na folha impressa (duas colunas, uma linha e meia por evento em média)
+  const alturaLegenda = n => n ? 30 + Math.ceil(n / 2) * 19 : 0;
+  let nLegenda = 0;
   function medidasMes(semanas) {
     const fixo = imprimindo || matchMedia('(min-width: 1021px)').matches;
     const m = imprimindo ? { num: 22, linha: 20, faixa: 14 } : { num: 30, linha: 26, faixa: 16 };
     if (!fixo) return { ...m, altura: null, linhas: 3 };
-    const util = imprimindo ? 620 : folha().clientHeight - 18 - 70 - 28 - corrMes; // folha − margens − cabeçalho − dias da semana
-    const altura = Math.max(imprimindo ? 70 : 72, Math.floor(util / semanas));
+    const util = imprimindo ? 570 - alturaLegenda(nLegenda) : folha().clientHeight - 18 - 70 - 28 - corrMes; // folha − margens − cabeçalho − dias da semana
+    const altura = Math.max(imprimindo ? 58 : 72, Math.floor(util / semanas));
     return { ...m, altura, linhas: 0 };
   }
   function telaMesDia() {
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
+    const doMes = numerar(p); nLegenda = doMes.length;
     const md = medidasMes(sems.length), lista = visiveis().slice().sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
     const chip = imprimindo ? 18 : 26;
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
@@ -196,12 +210,12 @@
           <span class="cel-extra">${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
             ${popDia === d ? `<div class="prazo-pop">${pz.map(({ e, i }) => `<button type="button" data-abrir="${e.id}"><b>${esc(i.txt)}</b><small>${sig(e)} · ${esc(e.titulo)}</small></button>`).join('')}</div>` : ''}</span>` : ''}
           ${extra ? `<button type="button" class="mais" data-semana="${ws}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''}: ver a semana">+${extra}</button>` : ''}</span>
-          <span class="dia-lista">${mostra.map(e => `<button type="button" class="barra-dia${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)}" data-abrir="${e.id}" title="${esc(`${sig(e)} – ${e.titulo} (${intervalo(e)})`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`).join('')}</span>
+          <span class="dia-lista">${mostra.map(e => `<button type="button" class="barra-dia${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)}" data-abrir="${e.id}" title="${esc(`${sig(e)} – ${e.titulo} (${intervalo(e)})`)}">${nev(e)}<span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`).join('')}</span>
         </div>`;
       }
       html += `</div>`;
     });
-    folha().innerHTML = html + rodape();
+    folha().innerHTML = html + legendaEventos(doMes) + rodape();
     if (md.altura && !imprimindo && !telaMesDia.ajustando) {
       const f = folha(), sobra = f.scrollHeight - f.clientHeight;
       if (sobra > 0 || sobra < -8) { corrMes = Math.max(-200, corrMes + sobra + 2); telaMesDia.ajustando = true; telaMesDia(); telaMesDia.ajustando = false; }
@@ -211,6 +225,7 @@
     if (modoMes() === 'dia') return telaMesDia();
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
+    const doMes = numerar(p); nLegenda = doMes.length;
     const md = medidasMes(sems.length), lista = visiveis();
     const longos = lista.filter(e => duracao(e) >= LONGO), curtos = lista.filter(e => duracao(e) < LONGO);
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
@@ -233,14 +248,14 @@
         </div>`;
       }
       fl.slice(0, nFl).forEach((ln, li) => ln.forEach(({ e, c0, c1, esq, dir }) => {
-        html += `<button type="button" class="faixa-longa${esq ? ' continua-esq' : ''}${dir ? ' continua-dir' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span><span class="ate">${dir ? 'até ' + curto(e.fim) : ''}</span></button>`;
+        html += `<button type="button" class="faixa-longa${esq ? ' continua-esq' : ''}${dir ? ' continua-dir' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}">${nev(e)}<span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span><span class="ate">${dir ? 'até ' + curto(e.fim) : ''}</span></button>`;
       }));
       fc.slice(0, nFc).forEach((ln, li) => ln.forEach(({ e, c0, c1, esq, dir }) => {
-        html += `<button type="button" class="barra${esq ? ' continua-esq' : ''}${dir ? ' continua-dir' : ''}${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${nFl + li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}"><span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`;
+        html += `<button type="button" class="barra${esq ? ' continua-esq' : ''}${dir ? ' continua-dir' : ''}${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)};grid-column:${c0 + 1}/${c1 + 2};grid-row:${nFl + li + 2}" data-abrir="${e.id}" aria-label="${esc(`${sig(e)} – ${e.titulo}, ${intervalo(e)}, ${pessoa(e.dono).ini}`)}">${nev(e)}<span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`;
       }));
       html += `</div>`;
     });
-    folha().innerHTML = html + rodape();
+    folha().innerHTML = html + legendaEventos(doMes) + rodape();
     // mede o que sobrou (ou faltou) e acerta a altura das semanas numa segunda passada
     if (md.altura && !imprimindo && !telaMes.ajustando) {
       const f = folha(), sobra = f.scrollHeight - f.clientHeight;
@@ -568,7 +583,7 @@
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (popDia) { popDia = null; desenhar(); } else if (aberto || formando) { aberto = null; formando = null; desenhar(); } } });
   function imprimir() {
     const st = document.createElement('style');
-    st.textContent = `@page { size: A4 ${vista === 'lista' ? 'portrait' : 'landscape'}; margin: 12mm; }`;
+    st.textContent = `@page { size: A4 ${vista === 'lista' ? 'portrait' : 'landscape'}; margin: 9mm 10mm; }`;
     document.head.appendChild(st); popDia = null; imprimindo = true; desenhar();
     window.print(); imprimindo = false; desenhar(); setTimeout(() => st.remove(), 500);
   }

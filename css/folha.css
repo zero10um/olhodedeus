@@ -410,3 +410,19 @@ html[data-vt=suave]::view-transition-old(*), html[data-vt=suave]::view-transitio
 .dia-chip:hover { border-color: var(--carbono); }
 .dia-chip svg { width: 14px; height: 14px; }
 [hidden] { display: none !important; }
+
+/* números e legenda dos eventos: só na folha impressa */
+.nev, .legenda-ev { display: none; }
+@media print {
+  .nev { display: inline-grid; place-items: center; flex: none; min-width: 15px; height: 14px; padding: 0 2px; margin-right: 1px; background: var(--tinta); color: #fff; font-size: 9px; font-weight: 800; line-height: 1; }
+  .legenda-ev { display: block; margin-top: 5px; padding-top: 4px; border-top: 1.5px solid var(--tinta); break-inside: avoid; }
+  .legenda-ev h2 { margin: 0 0 3px; font-size: 9pt; font-weight: 750; font-stretch: 78%; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-2); }
+  .legenda-ev ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 9mm; font-size: 8pt; line-height: 1.3; }
+  .legenda-ev li { display: flex; gap: 4px; align-items: baseline; break-inside: avoid; padding: 1.5px 0; border-bottom: 1px dotted var(--fio); }
+  .legenda-ev li .nev { align-self: center; }
+  .legenda-ev .sig { flex: none; font-size: 8pt; padding: 0 3px; }
+  .legenda-ev .le-t { min-width: 0; }
+  /* nada passa da folha: o calendário nunca empurra a legenda para outra página */
+  .cortica, .folha { break-inside: avoid; }
+  .semana { overflow: hidden; }
+}
