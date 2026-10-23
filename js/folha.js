@@ -104,7 +104,7 @@
   }
 
   /* ---------- estado da tela ---------- */
-  let vista = 'mes', ref = HOJE, aberto = null, formando = null, colando = null, soMeus = false, popDia = null;
+  let vista = 'mes', ref = HOJE, aberto = null, formando = null, colando = null, soMeus = false, popDia = null, popMais = null;
   let tipoFiltro = 'todos';
   try { const v = sessionStorage.getItem('folha-vista'); if (['ano', 'mes', 'semana', 'lista'].includes(v)) vista = v; const f = sessionStorage.getItem('folha-tipo'); if (['todos', 'I', 'E'].includes(f)) tipoFiltro = f; } catch (e) {}
   // o que cada pessoa esconde do calendário e o jeito de ver o mês ficam nas preferências dela (os colegas não são afetados)
@@ -193,17 +193,52 @@
     const altura = Math.max(imprimindo ? 58 : 72, Math.floor(util / semanas));
     return { ...m, altura, linhas: 0 };
   }
+  /* Impressão: nenhum evento fica escondido. Cada semana recebe a altura de que precisa; se não couber,
+     tudo encolhe um pouco (até 75%); se ainda assim não couber, o mês continua numa segunda folha. */
+  const PAGINA = 570, PAGINA_SEGUINTE = 640;
+  function planoImpressao(alturaDe, n) {
+    const util = PAGINA - alturaLegenda(nLegenda);
+    let esc = 1, tot = 0;
+    for (let i = 0; i < n; i++) tot += alturaDe(i, 1);
+    if (tot > util) { esc = Math.max(0.75, util / tot); tot = 0; for (let i = 0; i < n; i++) tot += alturaDe(i, esc); }
+    const alturas = [], quebras = new Set();
+    if (tot <= util) {
+      const folga = (util - tot) / n;
+      for (let i = 0; i < n; i++) alturas.push(Math.floor(alturaDe(i, esc) + folga));
+    } else {
+      let cap = PAGINA, usado = 0;
+      for (let i = 0; i < n; i++) {
+        const h = Math.ceil(alturaDe(i, esc));
+        if (usado + h > cap && usado > 0) { quebras.add(i); cap = PAGINA_SEGUINTE; usado = 0; }
+        usado += h; alturas.push(h);
+      }
+    }
+    return { esc, alturas, quebras };
+  }
+  const quebraPagina = () => `<div class="quebra-pag" aria-hidden="true"><span>${MESES[dt(ref).getMonth()]} ${dt(ref).getFullYear()} (continuação)</span></div><div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
+  // "+N": lista de todos os eventos daquele dia, sem sair do mês
+  function maisHTML(d, ws, extra) {
+    if (!extra) return '';
+    const doDia = visiveis().filter(e => ocorre(e, d)).sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
+    return `<span class="mais-w"><button type="button" class="mais" data-maisdia="${d}" aria-expanded="${popMais === d}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''} neste dia: ver todos">+${extra}</button>${popMais === d ? `<div class="prazo-pop mais-pop" role="dialog" aria-label="Eventos de ${curto(d)}"><p class="mp-t">${dt(d).getDate()} de ${MESES[dt(d).getMonth()]} · ${doDia.length} eventos</p>${doDia.map(e => `<button type="button" data-abrir="${e.id}"><b><span class="sig grifo" style="--pc:${pc(e)}">${sig(e)}</span> ${esc(e.titulo)}</b><small>${intervalo(e)} · ${esc(pessoa(e.dono).ini)}</small></button>`).join('')}<button type="button" class="mp-semana" data-semana="${ws}">Ver a semana inteira</button></div>` : ''}</span>`;
+  }
   function telaMesDia() {
     const p = periodo(), sems = [];
     for (let ws = seg(p.a); ws <= p.b; ws = soma(ws, 7)) sems.push(ws);
     const doMes = soMeus ? numerar(p) : (NUMS = new Map(), []); nLegenda = doMes.length; // números e legenda só na folha individual
     const md = medidasMes(sems.length), lista = visiveis().slice().sort((x, y) => x.ini.localeCompare(y.ini) || x.titulo.localeCompare(y.titulo));
     const chip = imprimindo ? 18 : 26;
+    // na impressão: quantos eventos tem o dia mais cheio de cada semana
+    const maxDia = sems.map(ws => Math.max(0, ...Array.from({ length: 7 }, (_, k) => lista.filter(e => ocorre(e, soma(ws, k))).length)));
+    const plano = imprimindo ? planoImpressao((i, esc) => md.num + 6 + Math.max(1, maxDia[i]) * chip * esc, sems.length) : null;
+    if (plano) folha().style.setProperty('--esc', plano.esc);
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
-    sems.forEach(ws => {
-      const cabe = md.altura ? Math.max(1, Math.floor((md.altura - md.num - 4) / chip)) : 4;
-      html += `<div class="semana semana-dia" data-ws="${ws}" style="${md.altura ? `height:${md.altura}px` : ''}">`;
+    sems.forEach((ws, si) => {
+      if (plano && plano.quebras.has(si)) html += quebraPagina();
+      const alt = plano ? plano.alturas[si] : md.altura;
+      const cabe = plano ? 999 : md.altura ? Math.max(1, Math.floor((md.altura - md.num - 4) / chip)) : 4;
+      html += `<div class="semana semana-dia${popMais && popMais >= ws && popMais <= soma(ws, 6) ? ' com-pop' : ''}" data-ws="${ws}" style="${alt ? `height:${alt}px` : ''}">`;
       for (let k = 0; k < 7; k++) {
         const d = soma(ws, k), pz = prazosDe(d, d), doDia = lista.filter(e => ocorre(e, d));
         const mostra = doDia.slice(0, cabe), extra = doDia.length - mostra.length; // o +N fica na linha do número, não ocupa lugar
@@ -211,7 +246,7 @@
           <span class="num"${d === HOJE ? ' aria-label="hoje"' : ''}>${dt(d).getDate()}</span>
           <span class="cel-extra">${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
             ${popDia === d ? `<div class="prazo-pop">${pz.map(({ e, i }) => `<button type="button" data-abrir="${e.id}"><b>${esc(i.txt)}</b><small>${sig(e)} · ${esc(e.titulo)}</small></button>`).join('')}</div>` : ''}</span>` : ''}
-          ${extra ? `<button type="button" class="mais" data-semana="${ws}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''}: ver a semana">+${extra}</button>` : ''}</span>
+          ${maisHTML(d, ws, extra)}</span>
           <span class="dia-lista">${mostra.map(e => `<button type="button" class="barra-dia${feitoTudo(e) ? ' feito' : ''}" style="--pc:${pc(e)}" data-abrir="${e.id}" title="${esc(`${sig(e)} – ${e.titulo} (${intervalo(e)})`)}">${nev(e)}<span class="sig">${sig(e)}</span><span class="t">${esc(e.titulo)}</span></button>`).join('')}</span>
         </div>`;
       }
@@ -232,21 +267,27 @@
     const longos = lista.filter(e => duracao(e) >= LONGO), curtos = lista.filter(e => duracao(e) < LONGO);
     let html = cabeca(MESES[dt(ref).getMonth()], `Agenda da equipe · ${dt(ref).getFullYear()}`);
     html += `<div class="dias-sem" aria-hidden="true">${SEM.map(s => `<span>${s}</span>`).join('')}</div>`;
-    sems.forEach(ws => {
-      const fl = faixas(ws, longos), fc = faixas(ws, curtos);
-      const nFl = Math.min(fl.length, 3);
+    const porSemana = sems.map(ws => ({ fl: faixas(ws, longos), fc: faixas(ws, curtos) }));
+    const plano = imprimindo ? planoImpressao((i, esc) => md.num + 6 + porSemana[i].fl.length * md.faixa * esc + Math.max(1, porSemana[i].fc.length) * md.linha * esc, sems.length) : null;
+    if (plano) folha().style.setProperty('--esc', plano.esc);
+    sems.forEach((ws, si) => {
+      if (plano && plano.quebras.has(si)) html += quebraPagina();
+      const { fl, fc } = porSemana[si];
+      const nFl = plano ? fl.length : Math.min(fl.length, 3);
       let nFc = md.linhas;
-      if (md.altura) nFc = Math.max(1, Math.floor((md.altura - md.num - 4 - nFl * md.faixa) / md.linha));
+      if (plano) nFc = Math.max(1, fc.length);
+      else if (md.altura) nFc = Math.max(1, Math.floor((md.altura - md.num - 4 - nFl * md.faixa) / md.linha));
+      const faixaPx = plano ? +(md.faixa * plano.esc).toFixed(1) : md.faixa, linhaPx = plano ? +(md.linha * plano.esc).toFixed(1) : md.linha, altSem = plano ? plano.alturas[si] : md.altura;
       const escondidos = k => fl.slice(nFl).filter(ln => ln.some(x => x.c0 <= k && x.c1 >= k)).length + fc.slice(nFc).filter(ln => ln.some(x => x.c0 <= k && x.c1 >= k)).length;
-      const linhas = `${md.num}px${nFl ? ` repeat(${nFl}, ${md.faixa}px)` : ''} repeat(${nFc}, ${md.linha}px) minmax(4px, 1fr)`;
-      html += `<div class="semana" data-ws="${ws}" style="grid-template-rows:${linhas}${md.altura ? `;height:${md.altura}px` : ''}">`;
+      const linhas = `${md.num}px${nFl ? ` repeat(${nFl}, ${faixaPx}px)` : ''} repeat(${nFc}, ${linhaPx}px) minmax(4px, 1fr)`;
+      html += `<div class="semana${popMais && popMais >= ws && popMais <= soma(ws, 6) ? ' com-pop' : ''}" data-ws="${ws}" style="grid-template-rows:${linhas}${altSem ? `;height:${altSem}px` : ''}">`;
       for (let k = 0; k < 7; k++) {
         const d = soma(ws, k), pz = prazosDe(d, d), extra = escondidos(k);
         html += `<div class="cel${d.slice(0, 7) !== p.a.slice(0, 7) ? ' fora' : ''}${k > 4 ? ' fds' : ''}${d === HOJE ? ' hoje' : ''}" style="grid-column:${k + 1}">
           <span class="num"${d === HOJE ? ' aria-label="hoje"' : ''}>${dt(d).getDate()}</span>
           <span class="cel-extra">${pz.length ? `<span class="prazos-dia"><button type="button" class="prazo-tag" data-dia="${d}" aria-expanded="${popDia === d}">${ic('flag')}${pz.length}<span> prazo${pz.length > 1 ? 's' : ''}</span></button>
             ${popDia === d ? `<div class="prazo-pop">${pz.map(({ e, i }) => `<button type="button" data-abrir="${e.id}"><b>${esc(i.txt)}</b><small>${sig(e)} · ${esc(e.titulo)}</small></button>`).join('')}</div>` : ''}</span>` : ''}
-          ${extra ? `<button type="button" class="mais" data-semana="${ws}" aria-label="Mais ${extra} evento${extra > 1 ? 's' : ''}: ver a semana">+${extra}</button>` : ''}</span>
+          ${maisHTML(d, ws, extra)}</span>
         </div>`;
       }
       fl.slice(0, nFl).forEach((ln, li) => ln.forEach(({ e, c0, c1, esq, dir }) => {
@@ -646,19 +687,20 @@
   };
 
   document.addEventListener('click', ev => {
-    const t = ev.target.closest('button, a'); if (!t) { if (popDia) { popDia = null; desenhar(); } return; }
+    const t = ev.target.closest('button, a'); if (!t) { if (popDia || popMais) { popDia = null; popMais = null; desenhar(); } return; }
     if (t.dataset.vista) { irPara(t.dataset.vista); return; }
     if (t.dataset.ocultar) { const id = t.dataset.ocultar; transicao('suave', () => alternarOculto(id)); requestAnimationFrame(() => { const b = lado().querySelector(`[data-ocultar="${id}"]`); if (b) b.focus(); }); return; }
     if (t.dataset.modo) { if (t.dataset.modo !== modoMes()) transicao('suave', () => { prefs().agendaModoMes = t.dataset.modo; A.salvar(); }); return; }
     if (t.dataset.tipo) { if (t.dataset.tipo !== tipoFiltro) transicao('suave', () => { tipoFiltro = t.dataset.tipo; try { sessionStorage.setItem('folha-tipo', tipoFiltro); } catch (e) {} }); return; }
     if (t.dataset.abrir) {
-      popDia = null; formando = null; colando = null; aberto = t.dataset.abrir;
+      popDia = null; popMais = null; formando = null; colando = null; aberto = t.dataset.abrir;
       const e = eventos.find(x => x.id === aberto); if (e && vista !== 'ano' && !noPeriodo(e, periodo().a, periodo().b)) ref = e.ini;
       desenhar(); focar('#ab-t'); if (innerWidth <= 1020) lado().scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
     }
+    if (t.dataset.maisdia) { popMais = popMais === t.dataset.maisdia ? null : t.dataset.maisdia; popDia = null; desenhar(); const b = folha().querySelector(`[data-maisdia="${t.dataset.maisdia}"]`); if (b) b.focus(); return; }
     if (t.dataset.dia) { popDia = popDia === t.dataset.dia ? null : t.dataset.dia; desenhar(); return; }
     if (t.dataset.mes) { irPara('mes', t.dataset.mes, t.closest('.mini')); return; }
-    if (t.dataset.semana) { irPara('semana', t.dataset.semana, t.closest('.semana')); return; }
+    if (t.dataset.semana) { popMais = null; irPara('semana', t.dataset.semana, t.closest('.semana')); return; }
     if (t.dataset.picote) {
       const e = eventos.find(x => x.id === aberto); if (!e || !pode(e)) return;
       marcar(e, t.dataset.picote); desenhar();
@@ -689,12 +731,12 @@
     const el = document.activeElement, digitando = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
     if (!digitando && !ev.altKey && !ev.ctrlKey && !ev.metaKey && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && !(el && el.closest('.vistas'))) { ev.preventDefault(); andarAnimado(ev.key === 'ArrowRight' ? 1 : -1); return; }
   });
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (popDia) { popDia = null; desenhar(); } else if (aberto || formando) { aberto = null; formando = null; desenhar(); } } });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (popDia || popMais) { const d = popMais; popDia = null; popMais = null; desenhar(); if (d) { const b = folha().querySelector(`[data-maisdia="${d}"]`); if (b) b.focus(); } } else if (aberto || formando) { aberto = null; formando = null; desenhar(); } } });
   function imprimir() {
     const st = document.createElement('style');
     st.textContent = `@page { size: A4 ${vista === 'lista' ? 'portrait' : 'landscape'}; margin: 9mm 10mm; }`;
     document.head.appendChild(st); popDia = null; imprimindo = true; desenhar();
-    window.print(); imprimindo = false; desenhar(); setTimeout(() => st.remove(), 500);
+    window.print(); imprimindo = false; folha().style.removeProperty('--esc'); desenhar(); setTimeout(() => st.remove(), 500);
   }
   window.addEventListener('beforeunload', () => A.salvarJa && A.salvarJa());
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (A.estado && vista === 'mes') desenhar(); }, 150); });
